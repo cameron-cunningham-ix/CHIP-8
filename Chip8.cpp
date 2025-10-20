@@ -167,7 +167,8 @@ void Chip8::TableE()
 }
 void Chip8::TableF()
 {
-    ((*this).*(FnTableF[Nib2]))();
+    // Table F relies on last byte for indexing rather than nibble
+    ((*this).*(FnTableF[Opcode & 0x00FF]))();
 }
 
 // Clear display
@@ -390,7 +391,7 @@ void Chip8::op_fx0a()
     PC -= 2;
     for (uint_8 i = 0; i < 16; i++)
     {
-        if (Keys[i] = 1) 
+        if (Keys[i] == 1) 
         {
             V[Vx] = i;
             PC += 2;
@@ -418,7 +419,8 @@ void Chip8::op_fx1e()
 // Font character
 void Chip8::op_fx29()
 {
-    I = RAM[(V[Vx] & 0x000F)*5 + FONT_START];
+    // I = RAM[(V[Vx] & 0x000F)*5 + FONT_START];
+    I = (V[Vx] & 0x000F)*5 + FONT_START;
 }
 // Binary-coded decimal conversion
 void Chip8::op_fx33()

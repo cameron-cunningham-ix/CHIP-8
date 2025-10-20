@@ -1,4 +1,3 @@
-// CHIP-8 Main Module
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -17,7 +16,7 @@ static int gDone;
 
 int gSDLColor = 0xFFFF00FF;
 
-char* fileName = "C:\\Users\\bluej\\SoftDevProjects\\GitHub\\CHIP-8\\roms\\3-corax+.ch8";
+char* fileName = "C:\\Users\\bluej\\SoftDevProjects\\GitHub\\CHIP-8\\roms\\6-keypad.ch8";
 
 // CHIP-8 Configurables
 // Used for ambiguous instructions, i.e. instructions that change between CHIP-8 and SUPER-CHIP.
@@ -249,8 +248,10 @@ int main(int argc, char *argv[])
 
     while (!gDone)
     {   
-        sdlLoop(chip8);
+        gDone = processInput(chip8.Keys);
         chip8.cycle();
+        update();
+        render(chip8.Display);
     }
 
     SDL_DestroyTexture(gSDLTexture);
