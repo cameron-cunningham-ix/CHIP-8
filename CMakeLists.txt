@@ -16,8 +16,8 @@ add_executable(CHIP8 main.cpp)
 
 # C source files
 target_sources(CHIP8 PRIVATE
-    display.h
-    memory.h
+    Chip8.cpp
+    Chip8.h
 )
 # Link to the actual SDL3 library.
 target_link_libraries(CHIP8 PRIVATE SDL3::SDL3)

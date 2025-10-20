@@ -1,7 +1,112 @@
-#include <cstdint>
+#ifndef CHIP8_H
+#define CHIP8_H
 
-// class Chip8
-// {
-// public:
-//     // uint_8 V[16]{};
-// }
+
+
+typedef unsigned char uint_8;
+typedef unsigned short int uint_16;
+
+
+
+class Chip8
+{
+private:
+    static const uint_16 MEMORY_SIZE = 4096;
+    static const uint_16 PROGRAM_START = 0x0200;
+    static const uint_8 FONT_START = 0x050;
+    static const uint_8 DISPLAY_WIDTH = 64;
+    static const uint_8 DISPLAY_HEIGHT = 32;
+
+    uint_16 Stack[16];
+    uint_16 SP;         // Stack Pointer
+    
+    uint_8 RAM[4096];
+    uint_8 V[16];       // Variable registers: V0 - VF; VF is flag register
+
+    uint_16 PC;         // Points at current instruction in memory
+    uint_16 I;          // Index register - point at locations in memory
+    uint_16 Opcode;     // Opcode - stores the current instruction
+
+    // Opcode helpers
+    uint_16 Nib1;       // First nibble (half byte) N000
+    uint_16 Nib2;       // Last nibble 000N
+    uint_16 Vx;         // Register Vx, not value in Vx
+    uint_16 Vy;         // Register Vy, not value in Vy
+
+    void initialize();
+
+    // Table functions
+    void Table0();
+    void Table8();
+    void TableE();
+    void TableF();
+    // Opcode functions
+    void op_00e0();
+    void op_00ee();
+    void op_1nnn();
+    void op_2nnn();
+    void op_3xnn();
+    void op_4xnn();
+    void op_5xy0();
+    void op_6xnn();
+    void op_7xnn();
+    void op_8xy0();
+    void op_8xy1();
+    void op_8xy2();
+    void op_8xy3();
+    void op_8xy4();
+    void op_8xy5();
+    void op_8xy6();
+    void op_8xy7();
+    void op_8xyE();
+    void op_9xy0();
+    void op_annn();
+    void op_bnnn();
+    void op_cxnn();
+    void op_dxyn();
+    void op_ex9e();
+    void op_exa1();
+    void op_fx07();
+    void op_fx0a();
+    void op_fx15();
+    void op_fx18();
+    void op_fx1e();
+    void op_fx29();
+    void op_fx33();
+    void op_fx55();
+    void op_fx65();
+    void op_null();
+    
+public:
+    
+    uint_8 Keys[16];    // HEX keypad
+
+    // Timers
+    uint_8 DelayTimer;
+    uint_8 SoundTimer;
+
+    uint_8 Display[DISPLAY_WIDTH * DISPLAY_HEIGHT];
+    bool DrawFlag;      // Set when draw required
+
+    // Configuration
+    bool ConfigShift;
+    bool ConfigJumpWOffset;
+
+    Chip8();
+    ~Chip8();
+
+    void cycle();       // Runs one emulation cycle
+    bool loadROM(char* filePath);
+
+    // Function pointer alias for Opcode FP tables
+    typedef void (Chip8::*Chip8Func)();
+    // Table size based on highest opcode value in that set
+    // e.g. table F has opcode fx65, so we need 0x65 + 1 to index into
+    Chip8Func FnTable[0xF + 1];
+    Chip8Func FnTable0[0xE + 1];
+    Chip8Func FnTable8[0xE + 1];
+    Chip8Func FnTableE[0xE + 1];
+    Chip8Func FnTableF[0x65 + 1];
+};
+
+#endif
