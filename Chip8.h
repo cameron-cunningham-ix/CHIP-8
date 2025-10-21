@@ -7,7 +7,8 @@ typedef unsigned char uint_8;
 typedef unsigned short int uint_16;
 
 
-
+/// @brief CHIP-8 interpreter class for interpreting / "emulating" CHIP-8 ROMs.
+/// Can be hooked into multiple platforms such as SDL, SFML, OpenGL + GLFW/, etc.
 class Chip8
 {
 private:
@@ -18,20 +19,20 @@ private:
     static const uint_8 DISPLAY_HEIGHT = 32;
 
     uint_16 Stack[16];
-    uint_16 SP;         // Stack Pointer
+    uint_16 SP;             // Stack Pointer
     
     uint_8 RAM[4096];
-    uint_8 V[16];       // Variable registers: V0 - VF; VF is flag register
+    uint_8 V[16];           // Variable registers: V0 - VF; VF is flag register
 
-    uint_16 PC;         // Points at current instruction in memory
-    uint_16 I;          // Index register - point at locations in memory
-    uint_16 Opcode;     // Opcode - stores the current instruction
+    uint_16 PC;             // Points at current instruction in memory
+    uint_16 I;              // Index register - point at locations in memory
+    uint_16 Opcode;         // Opcode - stores the current instruction
 
     // Opcode helpers
-    uint_16 Nib1;       // First nibble (half byte) N000
-    uint_16 Nib2;       // Last nibble 000N
-    uint_16 Vx;         // Register Vx, not value in Vx
-    uint_16 Vy;         // Register Vy, not value in Vy
+    uint_16 Nib1;           // First nibble (half byte) N000
+    uint_16 Nib2;           // Last nibble 000N
+    uint_16 Vx;             // Register Vx, not value in Vx
+    uint_16 Vy;             // Register Vy, not value in Vy
 
     void initialize();
 
@@ -79,24 +80,34 @@ private:
     
 public:
     
-    uint_8 Keys[16];    // HEX keypad
+    uint_8 Keys[16];        // HEX keypad for current frame
+    uint_8 PrevKeys[16];    // HEX keys from last frame; used for telling when key is released
 
     // Timers
     uint_8 DelayTimer;
     uint_8 SoundTimer;
 
-    uint_8 Display[DISPLAY_WIDTH * DISPLAY_HEIGHT];
-    bool DrawFlag;      // Set when draw required
+    unsigned int Display[DISPLAY_WIDTH * DISPLAY_HEIGHT];
+    bool DrawFlag;          // Set when draw required
 
     // Configuration
+    // Used for ambiguous instructions, i.e. instructions that change between CHIP-8 and SUPER-CHIP.
+    // 0 - CHIP-8   1 - SUPER-CHIP
     bool ConfigShift;
     bool ConfigJumpWOffset;
+    // Styling
+    unsigned int OnColor;
+    unsigned int OffColor;
 
     Chip8();
     ~Chip8();
 
-    void cycle();       // Runs one emulation cycle
+    void cycle();           // Runs one emulation cycle
     bool loadROM(char* filePath);
+
+    // Config
+    void setOnColor(unsigned int color);
+    void setOffColor(unsigned int color);
 
     // Function pointer alias for Opcode FP tables
     typedef void (Chip8::*Chip8Func)();

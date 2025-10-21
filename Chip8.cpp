@@ -6,8 +6,11 @@
 
 #include "Chip8.h"
 
-// Constructor / Destructor
+/// @brief Constructor - initializes FP tables for opcode functions
 Chip8::Chip8() {
+    // Set standard colors
+    OnColor = 0xFFFFFFFF;
+    OffColor = 0xFF000000;
     // Setup function pointer tables for opcode funcs
     FnTable[0x0] = &Chip8::Table0;
     FnTable[0x1] = &Chip8::op_1nnn;
@@ -67,10 +70,12 @@ Chip8::Chip8() {
 
 Chip8::~Chip8() {}
 
+/// @brief Initialize memory, registers, and display to 0.
+/// Start PC at PROGRAM_START, 0x0200
 void Chip8::initialize()
 {
     // Zero out RAM
-    memset(RAM, 0x00, 4096);
+    memset(RAM, 0, 4096);
     // Write font into RAM
     uint_8 font[80] = {
         0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -92,10 +97,16 @@ void Chip8::initialize()
     };
     memcpy(RAM + FONT_START, font, 80);
     // Zero out registers, keys, stack, display
-    memset(V, 0x00, 16);
-    memset(Keys, 0x00, 16);
-    memset(Stack, 0x0000, 16*sizeof(uint_16));
-    memset(Display, 0x00, 64*32);
+    memset(V, 0, 16);
+    memset(Keys, 0, 16);
+    memset(PrevKeys, 0, 16);
+    memset(Stack, 0, 16*sizeof(uint_16));
+    // NOTE: Can't use memset when trying to fill with values larger
+    // than 1 byte. Lesson learned.
+    for (int i = 0; i < DISPLAY_WIDTH*DISPLAY_HEIGHT; i++)
+    {
+        Display[i] = OffColor;
+    }
 
     SP = 0;
     I = 0;
@@ -108,7 +119,7 @@ void Chip8::initialize()
     srand(time(NULL));
 };
 
-// Initialize CHIP-8 and loads ROM into memory
+/// @brief Initialize CHIP-8 and loads ROM into CHIP-8 RAM
 bool Chip8::loadROM(char* filePath)
 {
     // Initialize CHIP-8 memory
@@ -129,6 +140,7 @@ bool Chip8::loadROM(char* filePath)
     return true;
 }
 
+/// @brief Emulates one CHIP-8 cycle
 void Chip8::cycle()
 {
     // Read the next 16-bit instruction
@@ -141,6 +153,8 @@ void Chip8::cycle()
     Nib2 = Opcode & 0x000F;         // Last nibble
     Vx = (Opcode & 0x0F00) >> 8;    // Register x, not value in Vx
     Vy = (Opcode & 0x00F0) >> 4;    // Register y, not value in Vy
+    // Reset DrawFlag
+    DrawFlag = 0;
 
     // Decode and Execute
     // Indexes the FnTable holding the function pointers for opcodes
@@ -152,6 +166,21 @@ void Chip8::cycle()
     if (SoundTimer > 0)
         SoundTimer--;
 }
+
+/// @brief Set the 'on' color
+/// @param color - AARRGGBB format
+void Chip8::setOnColor(unsigned int color)
+{
+    OnColor = color;
+}
+
+/// @brief Set the 'off' color
+/// @param color - AARRGGBB format
+void Chip8::setOffColor(unsigned int color)
+{
+    OffColor = color;
+}
+
 // Table functions
 void Chip8::Table0()
 {
@@ -171,23 +200,27 @@ void Chip8::TableF()
     ((*this).*(FnTableF[Opcode & 0x00FF]))();
 }
 
-// Clear display
+/// @brief Clear display
 void Chip8::op_00e0()
 {
-    memset(Display, 0x00, 64*32);
+    for (int i = 0; i < DISPLAY_WIDTH*DISPLAY_HEIGHT; i++)
+    {
+        Display[i] = OffColor;
+    }
+    DrawFlag = 1;
 }
-// Return call
+/// @brief Return call
 void Chip8::op_00ee()
 {
     SP--;
     PC = Stack[SP];
 }
-// Jump - Jump to address NNN
+/// @brief Jump - Jump to address NNN
 void Chip8::op_1nnn()
 {
     PC = Opcode & 0x0FFF;
 }
-// Call addr
+/// @brief Call addr
 void Chip8::op_2nnn()
 {
     // Push current PC onto stack and inc SP
@@ -196,7 +229,7 @@ void Chip8::op_2nnn()
     // Jump to NNN
     PC = Opcode & 0x0FFF;
 }
-// Skip instruction if Vx val == NN
+/// @brief Skip instruction if Vx val == NN
 void Chip8::op_3xnn()
 {
     if (V[Vx] == (Opcode & 0x00FF))
@@ -204,7 +237,7 @@ void Chip8::op_3xnn()
         PC += 2;
     }
 }
-// Skip instruction if Vx val != NN
+/// @brief Skip instruction if Vx val != NN
 void Chip8::op_4xnn()
 {
     if (V[Vx] != (Opcode & 0x00FF))
@@ -212,7 +245,7 @@ void Chip8::op_4xnn()
         PC += 2;  
     } 
 }
-// Skip instruction if Vx == Vy
+/// @brief Skip instruction if Vx == Vy
 void Chip8::op_5xy0()
 {
     if (V[Vx] == V[Vy])
@@ -220,38 +253,38 @@ void Chip8::op_5xy0()
         PC += 2;
     }
 }
-// 6xNN - Set register Vx to NN
+/// @brief 6xNN - Set register Vx to NN
 void Chip8::op_6xnn()
 {
     V[Vx] = Opcode & 0x00FF;
 }
-// 7xNN - Add NN to register Vx
+/// @brief 7xNN - Add NN to register Vx
 void Chip8::op_7xnn()
 {
     V[Vx] += (Opcode & 0x00FF);
 }
 // Logical / arithmetic ops
-// Set Vx to Vy
+/// @brief Set Vx to Vy
 void Chip8::op_8xy0()
 {
     V[Vx] = V[Vy];
 }
-// Binary OR
+/// @brief Binary OR
 void Chip8::op_8xy1()
 {
     V[Vx] = V[Vx] | V[Vy];
 }
-// Binary AND
+/// @brief Binary AND
 void Chip8::op_8xy2()
 {
     V[Vx] = V[Vx] & V[Vy];
 }
-// Logical XOR
+/// @brief Logical XOR
 void Chip8::op_8xy3()
 {
     V[Vx] = V[Vx] ^ V[Vy];
 }
-// Add with overflow detect
+/// @brief Add with overflow detect
 void Chip8::op_8xy4()
 {
     uint_8 x = V[Vx];
@@ -260,7 +293,7 @@ void Chip8::op_8xy4()
     if (x > V[Vx]) V[15] = 0x01;
     else V[15] = 0;
 }
-// Subtract Vx - Vy
+/// @brief Subtract Vx - Vy
 void Chip8::op_8xy5()
 {
     uint_8 x = V[Vx];
@@ -268,7 +301,7 @@ void Chip8::op_8xy5()
     if (V[Vx] > x)  V[15] = 0x00;   // "Underflowed"
     else V[15] = 0x01;
 }
-// Shift right
+/// @brief Shift right
 void Chip8::op_8xy6()
 {
     if (!ConfigShift)
@@ -279,7 +312,7 @@ void Chip8::op_8xy6()
     V[Vx] = x >> 1;
     V[15] = (x & 0x01);
 }
-// Subtract Vy - Vx
+/// @brief Subtract Vy - Vx
 void Chip8::op_8xy7()
 {
     uint_8 x = V[Vy];
@@ -287,7 +320,7 @@ void Chip8::op_8xy7()
     if (V[Vx] > x)  V[15] = 0x00;   // "Underflowed"
     else V[15] = 0x01;
 }
-// Shift left
+/// @brief Shift left
 void Chip8::op_8xyE()
 {
     if (!ConfigShift)
@@ -298,17 +331,17 @@ void Chip8::op_8xyE()
     V[Vx] = x << 1;
     V[15] = (x & 0x80) >> 7;
 }
-// Skip instruction if Vx != Vy
+/// @brief Skip instruction if Vx != Vy
 void Chip8::op_9xy0()
 {
     if (V[Vx] != V[Vy]) PC += 2;
 }
-// Set index register I to NNN
+/// @brief Set index register I to NNN
 void Chip8::op_annn()
 {
     I = Opcode & 0x0FFF;
 }
-// Jump with offset
+/// @brief Jump with offset
 void Chip8::op_bnnn()
 {
     if (!ConfigJumpWOffset)
@@ -318,14 +351,14 @@ void Chip8::op_bnnn()
         PC = Opcode & 0x0FFF + V[Vx];
     }
 }
-// Random
+/// @brief Random
 void Chip8::op_cxnn()
 {
     uint_8 x = (uint_8)rand();
     x &= (Opcode & 0x0FF0);
     V[Vx] = x;
 }
-// Draw N-byte sprite
+/// @brief Draw N-byte sprite
 void Chip8::op_dxyn()
 {
     uint_8 height = Opcode & 0x000F;     // Height of the sprite to be drawn
@@ -353,15 +386,15 @@ void Chip8::op_dxyn()
             uint_16 py = (y0 + row) & 31;
 
             // If this pixel in sprite is on and the screen pixel is on
-            if (spritePixel && Display[px + py*64] == 0x01)
+            if (spritePixel && Display[px + py*64] == OnColor)
             {
                 // XOR/turnoff screen pixel and set collision flag with VF
-                Display[px + py*64] = 0x00;
+                Display[px + py*64] = OffColor;
                 V[15] = 0x01;
             }
             else if (spritePixel)   // If pixel in sprite is on and screen pixel is off
             {
-                Display[px + py*64] = 0x01;
+                Display[px + py*64] = OnColor;
             }
             // If you reach right edge of screen break; CHIP-8 should not wrap sprites
             if (x0 + col >= 63) break;
@@ -369,29 +402,30 @@ void Chip8::op_dxyn()
         // If you reach bottom of screen
         if (y0 + row >= 31) break;
     }
+    DrawFlag = 1;
 }
-// Skip if key corresponding to value in Vx is pressed
+/// @brief Skip if key corresponding to value in Vx is pressed
 void Chip8::op_ex9e()
 {
     if (Keys[V[Vx]]) PC += 2;
 }
-// Skip if key corresponding to value in Vx is not pressed
+/// @brief Skip if key corresponding to value in Vx is not pressed
 void Chip8::op_exa1()
 {
     if (!Keys[V[Vx]]) PC += 2;
 }
-// Set Vx to value of delay timer
+/// @brief Set Vx to value of delay timer
 void Chip8::op_fx07()
 {
     V[Vx] = DelayTimer;
 }
-// Get key
+/// @brief Wait until key is released
 void Chip8::op_fx0a()
 {
     PC -= 2;
     for (uint_8 i = 0; i < 16; i++)
     {
-        if (Keys[i] == 1) 
+        if (Keys[i] == 0 && PrevKeys[i] == 1) 
         {
             V[Vx] = i;
             PC += 2;
@@ -399,30 +433,30 @@ void Chip8::op_fx0a()
         }
     }
 }
-// Set delay timer to value in Vx
+/// @brief Set delay timer to value in Vx
 void Chip8::op_fx15()
 {
     DelayTimer = V[Vx];
 }
-// Set sound timer to value in Vx
+/// @brief Set sound timer to value in Vx
 void Chip8::op_fx18()
 {
     SoundTimer = V[Vx];
 }
-// Add to index register
+/// @brief Add to index register
 void Chip8::op_fx1e()
 {
     I += V[Vx];
     // NOTE: OG COSMAC VIP interpeter did not set VF if I "overflows", but Amiga's did.
     if (I > 0x0FFF) V[15] = 0x01;
 }
-// Font character
+/// @brief Font character
 void Chip8::op_fx29()
 {
     // I = RAM[(V[Vx] & 0x000F)*5 + FONT_START];
     I = (V[Vx] & 0x000F)*5 + FONT_START;
 }
-// Binary-coded decimal conversion
+/// @brief Binary-coded decimal conversion
 void Chip8::op_fx33()
 {
     uint_8 x = V[Vx];
@@ -432,7 +466,7 @@ void Chip8::op_fx33()
     y /= 10;
     RAM[I] = y;
 }
-// Store memory
+/// @brief Store memory
 void Chip8::op_fx55()
 {
     for (uint_8 i = 0; i <= Vx; i++)
@@ -440,7 +474,7 @@ void Chip8::op_fx55()
         RAM[I + i] = V[i];
     }
 }
-// Load memory
+/// @brief Load memory
 void Chip8::op_fx65()
 {
     for (uint_8 i = 0; i <= Vx; i++)
@@ -448,7 +482,7 @@ void Chip8::op_fx65()
         V[i] = RAM[I + i];
     }
 }
-
+/// @brief Default function if opcode doesn't exist
 void Chip8::op_null()
 {
 }
