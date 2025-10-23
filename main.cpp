@@ -27,7 +27,8 @@ int main(int argc, char *argv[])
     int displayScale = std::stoi(argv[2]);
     int cycleDelay = std::stoi(argv[3]);
     
-    Chip8Platform platform(displayTitle, DISPLAY_WIDTH*displayScale, DISPLAY_HEIGHT*displayScale, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+    // Create emulation / debug window
+    Chip8Platform platform(displayTitle, 1920, 1080, DISPLAY_WIDTH, DISPLAY_HEIGHT);
     
     Chip8 chip8;
     
@@ -42,28 +43,25 @@ int main(int argc, char *argv[])
     // Continue running program
     bool done = false;
     // CHIP-8 cycles paused
-    bool pause = false;
     // Emulate next cycle
     bool nextCycle = false;
 
     while (!done)
     {   
-        done = platform.processInput(chip8.Keys, chip8.PrevKeys, pause, nextCycle);
+        done = platform.processInput(chip8.Keys, chip8.PrevKeys, platform.debugPause, platform.debugNextCycle);
 
         clock_t currentTime = clock();
         float deltaTime = (currentTime - lastCycleTime);
 
-        if ((deltaTime > cycleDelay && !pause) || (pause && nextCycle && deltaTime > cycleDelay*8))
+        if ((deltaTime > cycleDelay && !platform.debugPause) || (platform.debugPause &&  platform.debugNextCycle && deltaTime > cycleDelay*8))
         {
             lastCycleTime = currentTime;
-
             chip8.cycle();
-            if (chip8.DrawFlag)
-            {
-                platform.writeToBuffer(chip8.Display);
-                platform.render();
-            }
         }
+        
+        platform.debugNextCycle = false;    // This gets set in renderUI
+        platform.writeToBuffer(chip8.Display);
+        platform.renderUI(chip8);
     }
 
     return 0;

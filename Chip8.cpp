@@ -140,9 +140,21 @@ bool Chip8::loadROM(char* filePath)
     return true;
 }
 
+void Chip8::storePrevValues()
+{
+    memcpy(PrevStack, Stack, 16*sizeof(uint_8));
+    memcpy(PrevRAM, RAM, 4096*sizeof(uint_8));
+    memcpy(PrevV, V, 16*sizeof(uint_8));
+    PrevSP = SP;
+    PrevPC = PC;
+    PrevI = I;
+    PrevOpcode = Opcode;
+}
+
 /// @brief Emulates one CHIP-8 cycle
 void Chip8::cycle()
 {
+    storePrevValues();
     // Read the next 16-bit instruction
     Opcode = (RAM[PC] << 8) | RAM[PC + 1];
     // Increment PC by 2 to be ready for next opcode

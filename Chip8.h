@@ -28,7 +28,8 @@ private:
     uint_16 I;              // Index register - point at locations in memory
     uint_16 Opcode;         // Opcode - stores the current instruction
 
-    // Opcode helpers
+    // Helpers
+    // uint_16 PrevOpcode;     // For debug UI
     uint_16 Nib1;           // First nibble (half byte) N000
     uint_16 Nib2;           // Last nibble 000N
     uint_16 Vx;             // Register Vx, not value in Vx
@@ -81,7 +82,17 @@ private:
 public:
     
     uint_8 Keys[16];        // HEX keypad for current frame
+    // Previous values, used for debugging
     uint_8 PrevKeys[16];    // HEX keys from last frame; used for telling when key is released
+    uint_16 PrevStack[16];
+    uint_16 PrevSP;             // Stack Pointer
+    
+    uint_8 PrevRAM[4096];
+    uint_8 PrevV[16];           // Variable registers: V0 - VF; VF is flag register
+
+    uint_16 PrevPC;             // Points at current instruction in memory
+    uint_16 PrevI;              // Index register - point at locations in memory
+    uint_16 PrevOpcode;         // Opcode - stores the current instruction
 
     // Timers
     uint_8 DelayTimer;
@@ -104,10 +115,27 @@ public:
 
     void cycle();           // Runs one emulation cycle
     bool loadROM(char* filePath);
+    void storePrevValues();
 
     // Config
     void setOnColor(unsigned int color);
     void setOffColor(unsigned int color);
+
+    // Immutable getters for debugging
+    const uint_16& getStack() const { return *Stack; }
+    const uint_16 getSP() const { return SP; }
+    const uint_8* getRAM() const { return RAM; }
+    const uint_8* getVs() const { return V; }
+    const uint_16 getPC() const { return PC; }
+    const uint_16 getI() const { return I; }
+    const uint_16 getOpcode() const { return Opcode; }
+    const uint_16 getOpcodeAt(uint_16 addr) const { return (RAM[addr] << 8) | RAM[addr + 1]; }
+    const uint_8& getKeys() const { return *Keys; }
+    const uint_8& getPrevKeys() const { return *PrevKeys; }
+    const uint_8 getSoundTimer() const { return SoundTimer; }
+    const uint_8 getDelayTimer() const { return DelayTimer; }
+    const unsigned int& getDisplay() const { return *Display; }
+    const char* getOpcodeDescription(uint_16 opcode);
 
     // Function pointer alias for Opcode FP tables
     typedef void (Chip8::*Chip8Func)();

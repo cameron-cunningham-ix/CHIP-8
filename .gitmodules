@@ -1,0 +1,7 @@
+[submodule "SDL"]
+path = vendored/SDL
+url = https://github.com/libsdl-org/SDL.git
+
+[submodule "imgui"]
+path = vendored/imgui
+url = https://github.com/ocornut/imgui.git
