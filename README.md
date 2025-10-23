@@ -1,6 +1,8 @@
 <h1>WIP CHIP-8 Interpreter</h1>
 
 <h2>HISTORY:</h2><br>
+<b>v0.71</b> - Added some basic window scaling layout <br>
+<br>
 <b>v0.7</b> - Added more information to debug UI (previous & current SP, stack) <br>
 - Added some text labels to UI <br>
 <br>

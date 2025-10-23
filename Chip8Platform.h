@@ -30,6 +30,8 @@ public:
     uint_16 PrevPC;
     uint_16 PrevI;
     uint_16 PrevOpcode;
+    float mainScale;
+    int textureScale;
 
     /// @brief 
     /// @param title Title of SDL window created, appears at top
@@ -37,7 +39,7 @@ public:
     /// @param windowHeight SDL window height including UI
     /// @param textureWidth Width of CHIP-8 texture
     /// @param textureHeight Height of CHIP-8 texture
-    Chip8Platform(char* title, int windowWidth, int windowHeight, int textureWidth, int textureHeight)
+    Chip8Platform(char* title, int windowWidth, int windowHeight, int textureWidth, int textureHeight, int textureScale)
     {
         // SDL Initializations
         if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
@@ -46,17 +48,17 @@ public:
             std::cerr << "SDL failed to initialize\n";
         }
 
-        float mainScale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+        mainScale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
         SDL_WindowFlags windowFlags = SDL_WINDOW_RESIZABLE;
 
-        window = SDL_CreateWindow(title, windowWidth, windowHeight, windowFlags);
+        window = SDL_CreateWindow(title, windowWidth*mainScale, windowHeight*mainScale, windowFlags);
         if (!window)
         {
             SDL_GetError();
             std::cerr << "SDL failed to initialize the window\n";
         }
-        this->windowWidth = windowWidth;
-        this->windowHeight = windowHeight;
+        this->windowWidth = windowWidth*mainScale;
+        this->windowHeight = windowHeight*mainScale;
         
         renderer = SDL_CreateRenderer(window, NULL);
         SDL_SetRenderVSync(renderer, 1);
@@ -88,7 +90,7 @@ public:
             SDL_GetError();
             std::cerr << "SDL failed to allocate framebuffer\n";
         }
-
+        this->textureScale = textureScale;
         SDL_Log("SDL Initialized\n");
 
         // ImGui Initialization
@@ -98,6 +100,14 @@ public:
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+
+        // io.DisplaySize.x = (float)(windowWidth*mainScale);
+        // io.DisplaySize.y = (float)(windowHeight*mainScale);
+
+        ImFontConfig fontConfig;
+        fontConfig.SizePixels = 14.0f * mainScale;
+        io.Fonts->AddFontDefault(&fontConfig);
+        // io.Fonts->Build();
 
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
@@ -135,58 +145,72 @@ public:
         ImGui::NewFrame();
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove;
         // Set ImGui window to match viewport (SDL window)
-        ImGui::SetNextWindowSize(ImVec2((float)windowWidth, (float)windowHeight));
+        int currWindowWIdth, currWindowHeight;
+        SDL_GetWindowSizeInPixels(window, &currWindowWIdth, &currWindowHeight);
+        ImGui::SetNextWindowSize(ImVec2(currWindowWIdth, currWindowHeight));
+        // ImVec2 availSize = ImVec2((float)currWindowWIdth, (float)currWindowHeight);
 
         ImGui::Begin("UI", NULL, flags);
         // Debug UI
         if (debugUI)
         {
-            // Main menu bar
-            if (ImGui::BeginMenuBar())
+            ImGui::BeginGroup();
             {
-                if (ImGui::BeginMenu("Menu"))
+                // Main menu bar
+                if (ImGui::BeginMenuBar())
                 {
-                    // ImGui::MenuItem("Open", NULL, NULL);
+                    if (ImGui::BeginMenu("Menu"))
+                    {
+                        // ImGui::MenuItem("Open", NULL, NULL);
+                        ImGui::EndMenu();
+        
+                    }
                     ImGui::EndMenu();
+                }
     
-                }
-                ImGui::EndMenu();
-            }
-
-            if (!debugPause)
-            {
-                if (ImGui::Button("Pause Emulation"))
+                if (!debugPause)
                 {
-                    debugPause = true;
-                }
-            } 
-            else
-            {
-                if (ImGui::Button("Resume Emulation"))
+                    if (ImGui::Button("Pause Emulation"))
+                    {
+                        debugPause = true;
+                    }
+                } 
+                else
                 {
-                    debugPause = false;
+                    if (ImGui::Button("Resume Emulation"))
+                    {
+                        debugPause = false;
+                    }
                 }
+                ImGui::SameLine();
+                if (ImGui::Button("Next Cycle"))
+                {
+                    debugNextCycle = true;
+                }
+                // CHIP-8 display
+                ImGui::Image((void*)texture, ImVec2(textureWidth*textureScale, textureHeight*textureScale));
+                ImGui::EndGroup();
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Next Cycle"))
-            {
-                debugNextCycle = true;
-            }
-            // CHIP-8 display
-            ImGui::Image((void*)texture, ImVec2(textureWidth*16, textureHeight*16));
-            ImGui::SameLine();
-
+            
+            ImGui::SameLine(currWindowWIdth - (currWindowWIdth/1.8), 20.0f);
             // RAM table config
-            ImVec2 ramOuterSize = ImVec2(0.0f, 460.0f);
+            ImVec2 ramOuterSize = ImVec2(0.5f * currWindowWIdth, 0.4f * currWindowHeight);
             // RAM group - keeps "RAM" and the actual table inline vertically
             ImGui::BeginGroup();
             {
                 ImGui::Text("RAM");
                 if (ImGui::BeginTable("RAM", 17,
                         (ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
-                         ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg),
+                         ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
+                         ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit),
                         ramOuterSize))
                 {
+
+                    ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthStretch);
+                    for (int col = 0; col < 16; col++)
+                    {
+                        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+                    }
                     ImGuiListClipper clipper;
                     clipper.Begin(256);
                     while(clipper.Step())
@@ -201,6 +225,7 @@ public:
     
                             for (int col = 0; col < 16; col++)
                             {
+                                // ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
                                 ImGui::TableSetColumnIndex(col + 1);
     
                                 if (chip8.PrevPC == (col + row*16) || chip8.PrevPC == (col + row*16)-1)

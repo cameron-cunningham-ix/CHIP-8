@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     int cycleDelay = std::stoi(argv[3]);
     
     // Create emulation / debug window
-    Chip8Platform platform(displayTitle, 1920, 1080, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+    Chip8Platform platform(displayTitle, 1280, 720, DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale);
     
     Chip8 chip8;
     

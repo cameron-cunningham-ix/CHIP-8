@@ -82,14 +82,13 @@ private:
 public:
     
     uint_8 Keys[16];        // HEX keypad for current frame
-    // Previous values, used for debugging
     uint_8 PrevKeys[16];    // HEX keys from last frame; used for telling when key is released
+    
+    // Previous values, used for debugging
     uint_16 PrevStack[16];
     uint_16 PrevSP;             // Stack Pointer
-    
     uint_8 PrevRAM[4096];
     uint_8 PrevV[16];           // Variable registers: V0 - VF; VF is flag register
-
     uint_16 PrevPC;             // Points at current instruction in memory
     uint_16 PrevI;              // Index register - point at locations in memory
     uint_16 PrevOpcode;         // Opcode - stores the current instruction
