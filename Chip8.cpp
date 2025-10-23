@@ -142,7 +142,7 @@ bool Chip8::loadROM(char* filePath)
 
 void Chip8::storePrevValues()
 {
-    memcpy(PrevStack, Stack, 16*sizeof(uint_8));
+    memcpy(PrevStack, Stack, 16*sizeof(uint_16));
     memcpy(PrevRAM, RAM, 4096*sizeof(uint_8));
     memcpy(PrevV, V, 16*sizeof(uint_8));
     PrevSP = SP;

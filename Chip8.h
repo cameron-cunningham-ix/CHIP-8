@@ -122,7 +122,7 @@ public:
     void setOffColor(unsigned int color);
 
     // Immutable getters for debugging
-    const uint_16& getStack() const { return *Stack; }
+    const uint_16* getStack() const { return Stack; }
     const uint_16 getSP() const { return SP; }
     const uint_8* getRAM() const { return RAM; }
     const uint_8* getVs() const { return V; }

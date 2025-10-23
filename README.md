@@ -1,6 +1,14 @@
 <h1>WIP CHIP-8 Interpreter</h1>
 
 <h2>HISTORY:</h2><br>
+<b>v0.7</b> - Added more information to debug UI (previous & current SP, stack) <br>
+- Added some text labels to UI <br>
+<br>
+<b>v0.6</b> - Included ImGui into project. Using the SDL3Renderer backend for ease <br>
+- Added initial parts of ImGui debugging window <br>
+- Added fields for previous cycle's values for things like the stack, memory, and registers to Chip8, also for debugging <br>
+- Added .gitmodules for ease of grabbing SDL and ImGui <br>
+<br>
 <b>v0.5</b> - Big jump from v0.01, but justified as the interpreter is now fully working! (I believe. I haven't had any tests or games break it so far)<br> - Created Chip8Platform class, taking inspiration from https://austinmorlan.com/posts/chip8_emulator/ <br> - Added some Doxygen comments<br> - Added color configuration<br> - Changed configuration to run off of input arguments <br> - Added very basic pause and step through functionality<br> - Included 2 more ROMs, 1D cellular automata and breakout<br> - Renamed the Tetris file since for some reason the previous name crashed the program on startup. Certainly something with the displayTitle concat to fix<br>
 <br>
 The next goal for v1.0 is to do step 2, create a debug window that displays the current opcode, registers and values, stack, and memory with ImGUI.<br>
