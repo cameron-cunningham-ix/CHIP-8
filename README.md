@@ -1,6 +1,17 @@
-<h1>WIP CHIP-8 Interpreter</h1>
+<h1>CHIP-8 Interpreter</h1>
+<br>
+A CHIP-8 interpreter / "emulator" written in C++
+<img src="pictures/image.png">
+
+<h2>Usage:</h2>
+CHIP8.exe [ROM File Path] [DisplayScale int] [CycleDelay int] [opt:OnColor RRGGBBAA] [opt:OffColor RRGGBBAA] <br>
 
 <h2>HISTORY:</h2><br>
+<b>v0.72</b> - Removed roms folder for cleaner repo and licensing <br>
+- Removed VSync from renderUI, as it was slowing emulation down to screen refresh rate <br>
+- Added simple load and save state <br>
+- Minor UI layout changes <br>
+<br>
 <b>v0.71</b> - Added some basic window scaling layout <br>
 <br>
 <b>v0.7</b> - Added more information to debug UI (previous & current SP, stack) <br>

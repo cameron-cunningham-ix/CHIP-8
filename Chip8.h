@@ -8,7 +8,7 @@ typedef unsigned short int uint_16;
 
 
 /// @brief CHIP-8 interpreter class for interpreting / "emulating" CHIP-8 ROMs.
-/// Can be hooked into multiple platforms such as SDL, SFML, OpenGL + GLFW/, etc.
+/// Can be hooked into multiple platforms such as SDL, OpenGL + GLFW/, etc.
 class Chip8
 {
 private:
@@ -87,7 +87,6 @@ public:
     // Previous values, used for debugging
     uint_16 PrevStack[16];
     uint_16 PrevSP;             // Stack Pointer
-    uint_8 PrevRAM[4096];
     uint_8 PrevV[16];           // Variable registers: V0 - VF; VF is flag register
     uint_16 PrevPC;             // Points at current instruction in memory
     uint_16 PrevI;              // Index register - point at locations in memory

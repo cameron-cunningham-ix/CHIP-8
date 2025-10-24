@@ -10,7 +10,7 @@
 Chip8::Chip8() {
     // Set standard colors
     OnColor = 0xFFFFFFFF;
-    OffColor = 0xFF000000;
+    OffColor = 0x000000FF;
     // Setup function pointer tables for opcode funcs
     FnTable[0x0] = &Chip8::Table0;
     FnTable[0x1] = &Chip8::op_1nnn;
@@ -143,7 +143,6 @@ bool Chip8::loadROM(char* filePath)
 void Chip8::storePrevValues()
 {
     memcpy(PrevStack, Stack, 16*sizeof(uint_16));
-    memcpy(PrevRAM, RAM, 4096*sizeof(uint_8));
     memcpy(PrevV, V, 16*sizeof(uint_8));
     PrevSP = SP;
     PrevPC = PC;
@@ -179,18 +178,28 @@ void Chip8::cycle()
         SoundTimer--;
 }
 
-/// @brief Set the 'on' color
-/// @param color - AARRGGBB format
+/// @brief Set the 'on' color and write it to display
+/// @param color - RRGGBBAA format
 void Chip8::setOnColor(unsigned int color)
 {
+    for (int i = 0; i < DISPLAY_WIDTH*DISPLAY_HEIGHT; i++)
+    {
+        if (Display[i] == OnColor) Display[i] = color;
+    }
     OnColor = color;
+    DrawFlag = 1;
 }
 
-/// @brief Set the 'off' color
-/// @param color - AARRGGBB format
+/// @brief Set the 'off' color and write it to display
+/// @param color - RRGGBBAA format
 void Chip8::setOffColor(unsigned int color)
 {
+    for (int i = 0; i < DISPLAY_WIDTH*DISPLAY_HEIGHT; i++)
+    {
+        if (Display[i] == OffColor) Display[i] = color;
+    }
     OffColor = color;
+    DrawFlag = 1;
 }
 
 // Table functions
@@ -367,7 +376,7 @@ void Chip8::op_bnnn()
 void Chip8::op_cxnn()
 {
     uint_8 x = (uint_8)rand();
-    x &= (Opcode & 0x0FF0);
+    x &= (Opcode & 0x00FF);
     V[Vx] = x;
 }
 /// @brief Draw N-byte sprite

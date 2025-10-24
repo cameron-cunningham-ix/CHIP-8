@@ -30,7 +30,10 @@ int main(int argc, char *argv[])
     // Create emulation / debug window
     Chip8Platform platform(displayTitle, 1280, 720, DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale);
     
+    // Running CHIP-8
     Chip8 chip8;
+    // CHIP-8 to load for save state
+    Chip8 saveStateChip8;
     
     // Config
     if (argc > 4) chip8.setOnColor(std::stoul(argv[4], nullptr, 16));
@@ -60,8 +63,26 @@ int main(int argc, char *argv[])
         }
         
         platform.debugNextCycle = false;    // This gets set in renderUI
-        platform.writeToBuffer(chip8.Display);
+        if (chip8.DrawFlag)
+        {
+            platform.writeToBuffer(chip8.Display);
+        }
+        
         platform.renderUI(chip8);
+
+        // Load & Save state
+        if (platform.saveNewState)
+        {
+            saveStateChip8 = chip8;
+        }
+        if (platform.loadSaveState)
+        {
+            chip8 = saveStateChip8;
+            chip8.DrawFlag = true;
+        }
+        
+        platform.saveNewState = false;
+        platform.loadSaveState = false;
     }
 
     return 0;
