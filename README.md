@@ -7,6 +7,9 @@ A CHIP-8 interpreter / "emulator" written in C++
 CHIP8.exe [ROM File Path] [DisplayScale int] [CycleDelay int] [opt:OnColor RRGGBBAA] [opt:OffColor RRGGBBAA] <br>
 
 <h2>HISTORY:</h2><br>
+<b>v0.73</b> - Removed vendored folder and SDL and ImGui submodules; CMake build now takes care of fetching the content <br>
+- Included NativeFileDialog-Extended, setting up for being able to open ROM files while running program <br>
+<br>
 <b>v0.72</b> - Removed roms folder for cleaner repo and licensing <br>
 - Removed VSync from renderUI, as it was slowing emulation down to screen refresh rate <br>
 - Added simple load and save state <br>

@@ -1,38 +1,111 @@
-
-cmake_minimum_required(VERSION 3.16)
-project(CHIP8)
+cmake_minimum_required(VERSION 3.21) # 3.21+ for TARGET_RUNTIME_DLLS
+project(CHIP8 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# set the output directory for built objects.
-# This makes sure that the dynamic library goes into the build directory automatically.
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+# -----------------------------
+# Default to Release for single-config generators (Ninja/Make)
+# -----------------------------
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
 
+include(FetchContent)
 
-# This assumes the SDL and imGui sources are available in vendored/
-add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
-add_subdirectory(vendored/imgui EXCLUDE_FROM_ALL)
+# -----------------------------
+# SDL3
+# -----------------------------
+# Build shared so we get SDL3.dll on Windows (or .so/.dylib elsewhere)
+set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+set(SDL_TEST OFF CACHE BOOL "" FORCE)
+set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
 
-# Create game executable target
-add_executable(CHIP8 main.cpp
-    Chip8.cpp
+FetchContent_Declare(
+  SDL3
+  GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+  GIT_TAG main
+)
+FetchContent_MakeAvailable(SDL3) # Provides SDL3::SDL3 and SDL3::SDL3main
+
+# -----------------------------
+# Dear ImGui (custom target with SDL3/SDL_Renderer backends)
+# -----------------------------
+FetchContent_Declare(
+  imgui
+  GIT_REPOSITORY https://github.com/ocornut/imgui.git
+  GIT_TAG docking
 )
 
-# C source files
-target_sources(CHIP8 PRIVATE
-    Chip8.cpp
-    Chip8.h
-    Chip8Platform.h
+FetchContent_GetProperties(imgui)
+if(NOT imgui_POPULATED)
+  FetchContent_Populate(imgui)
+
+  add_library(imgui STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp
+  )
+
+  target_include_directories(imgui PUBLIC
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+  )
+  target_link_libraries(imgui PUBLIC SDL3::SDL3)
+endif()
+
+# -----------------------------
+# Native File Dialog Extended
+# -----------------------------
+FetchContent_Declare(
+    nfd
+    GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
+    GIT_TAG 86d5f2005fe1c00747348a12070fec493ea2407e    # v1.2.1
+)
+FetchContent_MakeAvailable(nfd)
+
+# -----------------------------
+# Executable
+# -----------------------------
+add_executable(CHIP8
+  main.cpp
+  Chip8.cpp
+  Chip8.h
+  Chip8Platform.h
 )
 
-target_include_directories(CHIP8 PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
+target_include_directories(CHIP8 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(CHIP8 PRIVATE SDL3::SDL3 imgui nfd)
+if(TARGET SDL3::SDL3main)
+  target_link_libraries(CHIP8 PRIVATE SDL3::SDL3main)
+endif()
+
+# Warnings
+if(MSVC)
+  target_compile_options(CHIP8 PRIVATE /W4 /permissive- /Zc:preprocessor /utf-8)
+else()
+  target_compile_options(CHIP8 PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+# Nice output layout (esp. on MSVC multi-config)
+set_target_properties(CHIP8 PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+  ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
 )
 
-# Link to the actual SDL3 library.
-target_link_libraries(CHIP8 PRIVATE
-    SDL3::SDL3 
-    imgui
+# -----------------------------
+# Auto-copy runtime DLLs next to the exe (Windows/MSVC friendly)
+# Works via generator expressions (CMake 3.21+)
+# -----------------------------
+add_custom_command(TARGET CHIP8 POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          $<TARGET_RUNTIME_DLLS:CHIP8>
+          $<TARGET_FILE_DIR:CHIP8>
+  COMMAND_EXPAND_LISTS
 )

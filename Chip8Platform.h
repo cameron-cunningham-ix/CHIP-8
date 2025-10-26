@@ -5,6 +5,7 @@
 #include "imgui_impl_sdlrenderer3.h"
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_main.h"
+#include "nfd.h"
 
 /// @brief SDL + ImGui platform for CHIP-8 rendering and input
 class Chip8Platform
@@ -122,10 +123,17 @@ public:
         // Setup Platform/Renderer backends
         ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
         ImGui_ImplSDLRenderer3_Init(renderer);
+
+        // Initialize NFD
+        if (NFD_Init() != NFD_OKAY)
+        {
+            SDL_Log("Native File Dialog failed to initialize\n");
+        }
     }
 
     ~Chip8Platform()
     {
+        NFD_Quit();
         ImGui_ImplSDLRenderer3_Shutdown();
         ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
