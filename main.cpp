@@ -14,41 +14,22 @@ const int DISPLAY_HEIGHT = 32;
 
 int main(int argc, char *argv[])
 {
-    if (argc < 4)
-    {
-        std::cerr << "CHIP-8 Usage: " << argv[0] << " <ROM File Path> <DisplayScale int> <CycleDelay int>\n\t"
-        << "<opt:OnColor 0xAARRGGBB> <opt:OffColor 0xAARRGGBB>\n";
-        return -1;
-    }
-    
-    char* fileName = argv[1];
     char displayTitle[128] = "CHIP-8: ";
-    strncat(displayTitle, fileName, 118);
-    int displayScale = std::stoi(argv[2]);
-    int cycleDelay = std::stoi(argv[3]);
     
     // Create emulation / debug window
-    Chip8Platform platform(displayTitle, 1280, 720, DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale);
+    Chip8Platform platform(displayTitle, 1280, 720, DISPLAY_WIDTH, DISPLAY_HEIGHT);
     
     // Running CHIP-8
     Chip8 chip8;
     // CHIP-8 to load for save state
     Chip8 saveStateChip8;
     
-    // Config
-    if (argc > 4) chip8.setOnColor(std::stoul(argv[4], nullptr, 16));
-    if (argc > 5) chip8.setOffColor(std::stoul(argv[5], nullptr, 16));
-
-    chip8.loadROM(fileName);
-
     clock_t lastCycleTime = clock();
 
     // Continue running program
     bool done = false;
     // CHIP-8 cycles paused
     // Emulate next cycle
-    bool nextCycle = false;
-
     while (!done)
     {   
         done = platform.processInput(chip8.Keys, chip8.PrevKeys, platform.debugPause, platform.debugNextCycle);
@@ -56,7 +37,7 @@ int main(int argc, char *argv[])
         clock_t currentTime = clock();
         float deltaTime = (currentTime - lastCycleTime);
 
-        if ((deltaTime > cycleDelay && !platform.debugPause) || (platform.debugPause &&  platform.debugNextCycle && deltaTime > cycleDelay*8))
+        if ((deltaTime > chip8.CycleDelay && !platform.debugPause) || (platform.debugPause &&  platform.debugNextCycle && deltaTime > chip8.CycleDelay*8))
         {
             lastCycleTime = currentTime;
             chip8.cycle();

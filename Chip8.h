@@ -102,6 +102,7 @@ public:
     // Configuration
     // Used for ambiguous instructions, i.e. instructions that change between CHIP-8 and SUPER-CHIP.
     // 0 - CHIP-8   1 - SUPER-CHIP
+    int CycleDelay = 1;
     bool ConfigShift;
     bool ConfigJumpWOffset;
     // Styling

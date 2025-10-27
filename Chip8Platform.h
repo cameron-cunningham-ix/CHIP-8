@@ -22,6 +22,8 @@ private:
     SDL_Texture* texture = nullptr;
     
 public:
+    // UI flags
+    bool m_ShowEmulationSettings = false;
     // Debug flags
     bool debugPause = false;
     bool debugNextCycle = false;
@@ -30,9 +32,9 @@ public:
     bool loadSaveState = false;
     // Platform
     float mainScale;
-    int textureScale;
-    ImVec4 onColorRef;
-    ImVec4 offColorRef;
+    int textureScale = 8;
+    ImVec4 onColorRef = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+    ImVec4 offColorRef = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
 
     /// @brief 
     /// @param title Title of SDL window created, appears at top
@@ -40,7 +42,7 @@ public:
     /// @param windowHeight SDL window height including UI
     /// @param textureWidth Width of CHIP-8 texture
     /// @param textureHeight Height of CHIP-8 texture
-    Chip8Platform(char* title, int windowWidth, int windowHeight, int textureWidth, int textureHeight, int textureScale)
+    Chip8Platform(char* title, int windowWidth, int windowHeight, int textureWidth, int textureHeight)
     {
         // SDL Initializations
         if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
@@ -52,7 +54,7 @@ public:
         mainScale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
         SDL_WindowFlags windowFlags = SDL_WINDOW_RESIZABLE;
 
-        window = SDL_CreateWindow(title, windowWidth*mainScale, windowHeight*mainScale, windowFlags);
+        window = SDL_CreateWindow(title, (int)windowWidth*mainScale, (int)windowHeight*mainScale, windowFlags);
         if (!window)
         {
             SDL_GetError();
@@ -111,7 +113,7 @@ public:
 
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
-        //ImGui::StyleColorsLight();
+        // ImGui::StyleColorsLight();
 
         // Setup scaling
         ImGuiStyle& style = ImGui::GetStyle();
@@ -144,7 +146,7 @@ public:
     }
 
     /// @brief Render the UI and emulation display
-    void renderUI(Chip8 chip8)
+    void renderUI(Chip8 &chip8)
     {
         // Start ImGui frame
         ImGui_ImplSDLRenderer3_NewFrame();
@@ -164,6 +166,35 @@ public:
             // Left side (emulation, registers)
             ImGui::BeginGroup();
             {
+                if (ImGui::Button("Open ROM"))
+                {
+                    // File dialog open
+                    nfdu8char_t *outPath;
+                    nfdu8filteritem_t filters[1] = { { "ROMs", "ch8" }};
+                    nfdopendialogu8args_t args = {0};
+                    args.filterList = filters;
+                    args.filterCount = 1;
+                    nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
+                    if (result == NFD_OKAY)
+                    {
+                        puts("Success!");
+                        puts(outPath);
+                        if (chip8.loadROM(outPath))
+                        {
+                            puts("ROM loaded sucessfully");
+                        }
+                        NFD_FreePathU8(outPath);
+                    }
+                    else if (result == NFD_CANCEL)
+                    {
+                        puts("User pressed cancel.");
+                    }
+                    else 
+                    {
+                        printf("Error: %s\n", NFD_GetError());
+                    }
+                }
+                ImGui::SameLine();
                 if (!debugPause)
                 {
                     if (ImGui::Button("Pause Emulation"))
@@ -194,7 +225,43 @@ public:
                     loadSaveState = true;
                 }
                 ImGui::SameLine();
-                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "V0.72");
+                if (ImGui::BeginMenu("Settings"))
+                {
+                    if (ImGui::CollapsingHeader("Emulation", ImGuiTreeNodeFlags_None))                    
+                    {
+                        ImGui::SliderInt("Cycle Delay", &chip8.CycleDelay, 0, 128);
+                        ImGui::SetItemTooltip("Min delay between cycles (in ms)");
+                        ImGui::Checkbox("Shift Vy", &chip8.ConfigShift);
+                        ImGui::SetItemTooltip("Off - CHIP-8 functionality\nOn - CHIP-48 & SCHIP functionality");
+                        ImGui::Checkbox("Jump W/ Offset", &chip8.ConfigJumpWOffset);
+                        ImGui::SetItemTooltip("Off - CHIP-8 functionality\nOn - CHIP-48 & SCHIP functionality");
+                    }
+                    if (ImGui::CollapsingHeader("Display", ImGuiTreeNodeFlags_None))
+                    {
+                        ImGui::Text("Display size:");
+                        ImGui::SameLine();
+                        if (ImGui::Button("1x")) textureScale = 1;
+                        ImGui::SameLine();
+                        if (ImGui::Button("2x")) textureScale = 2;
+                        ImGui::SameLine();
+                        if (ImGui::Button("4x")) textureScale = 4;
+                        ImGui::SameLine();
+                        if (ImGui::Button("8x")) textureScale = 8;
+                        ImGui::SameLine();
+                        if (ImGui::Button("16x")) textureScale = 16;
+
+                        ImGuiColorEditFlags colorFlags = ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreview;
+                        if (!debugPause) colorFlags |= ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoDragDrop;
+                        ImGui::SetItemTooltip("NOTE: Set color only when emulation is paused");
+                        ImGui::ColorPicker4("On Color", &onColorRef.x, colorFlags);
+                        ImGui::SetItemTooltip("NOTE: Set color only when emulation is paused");
+                        ImGui::ColorPicker4("Off Color", &offColorRef.x, colorFlags);
+
+                    }
+                    ImGui::EndMenu();
+                }
+                // ImGui::PopItemWidth();
+                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "V0.74");
 
                 // CHIP-8 display
                 ImGui::Image((void*)texture, ImVec2(textureWidth*textureScale, textureHeight*textureScale));
@@ -227,7 +294,7 @@ public:
                     ImGui::Text("Prev Registers");
                     if (ImGui::BeginTable("Prev V", 2,
                             (ImGuiTableFlags_RowBg |
-                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedSame), vOuterSize))
+                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
                     {
                         ImGui::TableSetupColumn("V");
                         ImGui::TableSetupColumn("Value");
@@ -252,7 +319,7 @@ public:
                     ImGui::Text("Curr Registers");
                     if (ImGui::BeginTable("Curr V", 2,
                             (ImGuiTableFlags_RowBg |
-                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedSame), vOuterSize))
+                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
                     {
                         ImGui::TableSetupColumn("V");
                         ImGui::TableSetupColumn("Value");
@@ -286,7 +353,7 @@ public:
                     ImGui::Text("Prev Stack");
                     if (ImGui::BeginTable("Prev Stack", 2,
                             (ImGuiTableFlags_RowBg |
-                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedSame), vOuterSize))
+                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
                     {
                         ImGui::TableSetupColumn("Stack");
                         ImGui::TableSetupColumn("Value");
@@ -311,7 +378,7 @@ public:
                     ImGui::Text("Curr Stack");
                     if (ImGui::BeginTable("Curr Stack", 2,
                             (ImGuiTableFlags_RowBg |
-                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedSame), vOuterSize))
+                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
                     {
                         ImGui::TableSetupColumn("Stack");
                         ImGui::TableSetupColumn("Value");
@@ -337,13 +404,13 @@ public:
                         ImGui::EndTable();
                         ImGui::EndGroup();
                     }
-                    ImGui::EndGroup();
                 }
+                ImGui::EndGroup();
 
                 // Start for RAM table
-                ImGui::SameLine(currWindowWIdth - (currWindowWIdth/1.8), 0.0f);
+                ImGui::SameLine(currWindowWIdth - (currWindowWIdth/2), 0.0f);
                 // RAM table config
-                ImVec2 ramOuterSize = ImVec2(0.5f * currWindowWIdth, 0.4f * currWindowHeight);
+                ImVec2 ramOuterSize = ImVec2(0.475f * currWindowWIdth, 0.4f * currWindowHeight);
                 // RAM group - keeps "RAM" and the actual table inline vertically
                 ImGui::BeginGroup();
                 {
@@ -351,7 +418,7 @@ public:
                     if (ImGui::BeginTable("RAM", 17,
                             (ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
                             ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
-                            ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit),
+                            ImGuiTableFlags_SizingFixedFit),
                             ramOuterSize))
                     {
 
@@ -409,6 +476,9 @@ public:
         ImGui::End();
         // End UI
 
+        chip8.setOnColor(vec4ToRGBA(onColorRef));
+        chip8.setOffColor(vec4ToRGBA(offColorRef));
+
         // Copy data from frameBuffer into texture
         if (chip8.DrawFlag)
         {
@@ -445,6 +515,16 @@ public:
                 frameBuffer[c] = display[j + i*textureWidth];
             }
         }
+    }
+
+    unsigned int vec4ToRGBA(ImVec4 vec4)
+    {
+        unsigned int r = vec4.x * 255;
+        unsigned int g = vec4.y * 255;
+        unsigned int b = vec4.z * 255;
+        unsigned int a = vec4.w * 255;
+        unsigned int val = (r << 24) | g << 16 | b << 8 | a;
+        return val;
     }
 
     /// @brief Process input events for CHIP-8

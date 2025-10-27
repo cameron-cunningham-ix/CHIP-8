@@ -8,6 +8,9 @@
 
 /// @brief Constructor - initializes FP tables for opcode functions
 Chip8::Chip8() {
+    // Initial Configuration
+    ConfigShift = true;
+    ConfigJumpWOffset = true;
     // Set standard colors
     OnColor = 0xFFFFFFFF;
     OffColor = 0x000000FF;
@@ -327,6 +330,7 @@ void Chip8::op_8xy6()
 {
     if (!ConfigShift)
     {
+        // Original CHIP-8 behavior
         V[Vx] = V[Vy];
     }
     uint_8 x = V[Vx];
@@ -346,6 +350,7 @@ void Chip8::op_8xyE()
 {
     if (!ConfigShift)
     {
+        // Original CHIP-8 behavior
         V[Vx] = V[Vy];
     }
     uint_8 x = V[Vx];
@@ -367,6 +372,7 @@ void Chip8::op_bnnn()
 {
     if (!ConfigJumpWOffset)
     {
+        // Original CHIP-8 behavior
         PC = Opcode & 0x0FFF + V[0];
     } else {
         PC = Opcode & 0x0FFF + V[Vx];

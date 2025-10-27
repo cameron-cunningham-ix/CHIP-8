@@ -1,12 +1,23 @@
 <h1>CHIP-8 Interpreter</h1>
 <br>
+<img src="pictures/image.png" style="max-width:800px;"> <br>
 A CHIP-8 interpreter / "emulator" written in C++
-<img src="pictures/image.png">
 
 <h2>Usage:</h2>
-CHIP8.exe [ROM File Path] [DisplayScale int] [CycleDelay int] [opt:OnColor RRGGBBAA] [opt:OffColor RRGGBBAA] <br>
+CHIP8.exe <br>
 
 <h2>HISTORY:</h2><br>
+<b>v0.74</b> - Removed command line args; you now run the .exe and set up everything in program <br>
+- Added Open ROM button to UI, uses NativeFileDialog-Extended library to open file dialog for picking ROM to run <br>
+- Added Settings button to UI with following options: <br>
+    - Cycle Delay: 0 to 128 <br>
+    - Shift Vy <br>
+    - Jump W/ Offset <br>
+    - Display sizes: 1x to 16x <br>
+    - On & off colors <br>
+- Added vec4ToRGBA function for color conversion <br>
+- Minor changes to layout and initialization <br>
+<br>
 <b>v0.73</b> - Removed vendored folder and SDL and ImGui submodules; CMake build now takes care of fetching the content <br>
 - Included NativeFileDialog-Extended, setting up for being able to open ROM files while running program <br>
 <br>
@@ -37,6 +48,7 @@ keypresses are not triggering the right behavior. I need a better way of debuggi
 
 <h2>Acknowledgements:</h2>
 <ul>
+<li>NativeFileDialog-Extended library: https://github.com/btzy/nativefiledialog-extended
 <li>Wonderful high-level overview of how to create a CHIP-8 interpreter: https://tobiasvl.github.io/blog/write-a-chip-8-emulator/#logical-and-arithmetic-instructions </li>
 <li>Test suite of ROMs: https://github.com/Timendus/chip8-test-suite </li>
 <li>Another CHIP-8 impl. in C++ used as reference, mainly for the function pointer table setup (wanted to test idea out for use in future GB emulator) and SDL Platform: https://austinmorlan.com/posts/chip8_emulator/ </li>
