@@ -145,6 +145,330 @@ public:
         SDL_Quit();
     }
 
+    /// @brief Draw the display / emulation ImGui window
+    void drawDisplayWindow()
+    {
+        ImGui::SetNextWindowPos(ImVec2(windowWidth/2, 0), ImGuiCond_None);
+        ImGui::SetNextWindowSize(ImVec2(textureWidth*textureScale, textureHeight*textureScale));
+        ImGui::Begin("Display", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+        ImGui::Image((void*)texture, ImVec2(textureWidth*textureScale, textureHeight*textureScale));
+        ImGui::End();
+    }
+
+    void drawDebugWindow(Chip8 &chip8)
+    {
+        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_None);
+        ImGui::SetNextWindowSize(ImVec2(windowWidth/4, windowHeight/2));
+        ImGui::Begin("Debug", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+        if (ImGui::Button("Open ROM"))
+        {
+            // File dialog open
+            nfdu8char_t *outPath;
+            nfdu8filteritem_t filters[1] = { { "ROMs", "ch8" }};
+            nfdopendialogu8args_t args = {0};
+            args.filterList = filters;
+            args.filterCount = 1;
+            nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
+            if (result == NFD_OKAY)
+            {
+                puts("Success!");
+                puts(outPath);
+                if (chip8.loadROM(outPath))
+                {
+                    puts("ROM loaded sucessfully");
+                }
+                NFD_FreePathU8(outPath);
+            }
+            else if (result == NFD_CANCEL)
+            {
+                puts("User pressed cancel.");
+            }
+            else 
+            {
+                printf("Error: %s\n", NFD_GetError());
+            }
+        }
+        // ImGui::SameLine();
+        if (!debugPause)
+        {
+            if (ImGui::Button("Pause Emulation"))
+            {
+                debugPause = true;
+            }
+        } 
+        else
+        {
+            if (ImGui::Button("Resume Emulation"))
+            {
+                debugPause = false;
+            }
+        }
+        // ImGui::SameLine();
+        if (ImGui::Button("Next Cycle"))
+        {
+            debugNextCycle = true;
+        }
+        // ImGui::SameLine();
+        if (ImGui::Button("Save State"))
+        {
+            saveNewState = true;
+        }
+        // ImGui::SameLine();
+        if (ImGui::Button("Load Save State"))
+        {
+            loadSaveState = true;
+        }
+        // ImGui::SameLine();
+        if (ImGui::BeginMenu("Settings"))
+        {
+            if (ImGui::CollapsingHeader("Emulation", ImGuiTreeNodeFlags_None))                    
+            {
+                ImGui::SliderInt("Cycle Delay", &chip8.CycleDelay, 0, 128);
+                ImGui::SetItemTooltip("Min delay between cycles (in ms)");
+                ImGui::Checkbox("Shift Vy", &chip8.ConfigShift);
+                ImGui::SetItemTooltip("Off - CHIP-8 functionality\nOn - CHIP-48 & SCHIP functionality");
+                ImGui::Checkbox("Jump W/ Offset", &chip8.ConfigJumpWOffset);
+                ImGui::SetItemTooltip("Off - CHIP-8 functionality\nOn - CHIP-48 & SCHIP functionality");
+            }
+            if (ImGui::CollapsingHeader("Display", ImGuiTreeNodeFlags_None))
+            {
+                ImGui::Text("Display size:");
+                ImGui::SameLine();
+                if (ImGui::Button("1x")) textureScale = 1;
+                ImGui::SameLine();
+                if (ImGui::Button("2x")) textureScale = 2;
+                ImGui::SameLine();
+                if (ImGui::Button("4x")) textureScale = 4;
+                ImGui::SameLine();
+                if (ImGui::Button("8x")) textureScale = 8;
+                ImGui::SameLine();
+                if (ImGui::Button("16x")) textureScale = 16;
+
+                ImGuiColorEditFlags colorFlags = ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreview;
+                if (!debugPause) colorFlags |= ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoDragDrop;
+                ImGui::SetItemTooltip("NOTE: Set color only when emulation is paused");
+                ImGui::ColorPicker4("On Color", &onColorRef.x, colorFlags);
+                ImGui::SetItemTooltip("NOTE: Set color only when emulation is paused");
+                ImGui::ColorPicker4("Off Color", &offColorRef.x, colorFlags);
+
+            }
+            ImGui::EndMenu();
+        }
+        // ImGui::PopItemWidth();
+        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "V0.74");
+        ImGui::End();
+    }
+
+    void drawRegistersWindow(Chip8 chip8)
+    {
+        ImGui::SetNextWindowPos(ImVec2(windowWidth/6, windowHeight/4), ImGuiCond_None);
+        ImGui::SetNextWindowSize(ImVec2(windowWidth/4, windowHeight/4));
+        ImGui::Begin("Registers", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+        // Prev values
+        ImGui::BeginGroup();
+        {
+            ImGui::Text("Prev PC: %04X", chip8.PrevPC);
+            ImGui::Text("Prev I: %04X", chip8.PrevI);
+            ImGui::Text("Prev SP: %04X", chip8.PrevSP);
+            ImGui::Text("Prev Opcode: %04X", chip8.PrevOpcode);
+            ImGui::EndGroup();
+        }
+        ImGui::SameLine();
+        // Curr values
+        ImGui::BeginGroup();
+        {
+            ImGui::Text("Curr PC: %04X", chip8.getPC());
+            ImGui::Text("Curr I: %04X", chip8.getI());
+            ImGui::Text("Curr SP: %04X", chip8.getSP());
+            ImGui::Text("Curr Opcode: %04X", chip8.getOpcode());
+            ImGui::EndGroup();
+        }
+
+        // Registers table config
+        ImVec2 vOuterSize = ImVec2(200.0f, 50.0f);
+        // Prev V
+        ImGui::BeginGroup();
+        {
+            ImGui::Text("Prev Registers");
+            if (ImGui::BeginTable("Prev V", 2,
+                    (ImGuiTableFlags_RowBg |
+                    ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
+            {
+                ImGui::TableSetupColumn("V");
+                ImGui::TableSetupColumn("Value");
+                ImGui::TableHeadersRow();
+                for (uint_16 row = 0; row < 16; row++)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("V[0x%1X]", row);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("0x%02X", chip8.PrevV[row]);
+
+                }
+                ImGui::EndTable();
+            }
+            ImGui::EndGroup();
+        }
+        ImGui::SameLine();
+        // Curr V
+        ImGui::BeginGroup();
+        {
+            ImGui::Text("Curr Registers");
+            if (ImGui::BeginTable("Curr V", 2,
+                    (ImGuiTableFlags_RowBg |
+                    ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
+            {
+                ImGui::TableSetupColumn("V");
+                ImGui::TableSetupColumn("Value");
+                ImGui::TableHeadersRow();
+                for (uint_16 row = 0; row < 16; row++)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("V[0x%X]", row);
+                    ImGui::TableSetColumnIndex(1);
+                    if (chip8.getVs()[row] != chip8.PrevV[row])
+                    {
+                        ImU32 cellBgColor = ImGui::GetColorU32(ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
+                        ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
+                        ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f) ,"0x%02X", chip8.getVs()[row]);
+                    }
+                    else
+                    {
+                        ImGui::Text("0x%02X", chip8.getVs()[row]);
+                    }
+
+                }
+                ImGui::EndTable();
+            }
+            ImGui::EndGroup();
+        }
+        ImGui::SameLine();
+        // Prev Stack
+        ImGui::BeginGroup();
+        {
+            ImGui::Text("Prev Stack");
+            if (ImGui::BeginTable("Prev Stack", 2,
+                    (ImGuiTableFlags_RowBg |
+                    ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
+            {
+                ImGui::TableSetupColumn("Stack");
+                ImGui::TableSetupColumn("Value");
+                ImGui::TableHeadersRow();
+                for (uint_16 row = 0; row < 16; row++)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("Stack[0x%1X]", row);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("0x%02X", chip8.PrevStack[row]);
+
+                }
+                ImGui::EndTable();
+            }
+            ImGui::EndGroup();
+        }
+        ImGui::SameLine();
+        // Curr Stack
+        ImGui::BeginGroup();
+        {
+            ImGui::Text("Curr Stack");
+            if (ImGui::BeginTable("Curr Stack", 2,
+                    (ImGuiTableFlags_RowBg |
+                    ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
+            {
+                ImGui::TableSetupColumn("Stack");
+                ImGui::TableSetupColumn("Value");
+                ImGui::TableHeadersRow();
+                for (uint_16 row = 0; row < 16; row++)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("Stack[0x%X]", row);
+                    ImGui::TableSetColumnIndex(1);
+                    if (chip8.getStack()[row] != chip8.PrevStack[row])
+                    {
+                        ImU32 cellBgColor = ImGui::GetColorU32(ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
+                        ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
+                        ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f) ,"0x%02X", chip8.getStack()[row]);
+                    }
+                    else
+                    {
+                        ImGui::Text("0x%02X", chip8.getStack()[row]);
+                    }
+
+                }
+                ImGui::EndTable();
+                ImGui::EndGroup();
+            }
+        }
+        ImGui::EndGroup();
+        ImGui::End();
+    }
+
+    void drawRAMWindow(Chip8 chip8)
+    {
+        // RAM table config
+        ImVec2 ramOuterSize = ImVec2(0.475f * windowWidth, 0.4f * windowHeight);
+        // RAM group - keeps "RAM" and the actual table inline vertically
+        ImGui::Begin("RAM", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+        if (ImGui::BeginTable("RAM", 17,
+                (ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
+                ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
+                ImGuiTableFlags_SizingFixedFit),
+                ramOuterSize))
+        {
+
+            ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthStretch);
+            for (int col = 0; col < 16; col++)
+            {
+                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+            }
+            ImGuiListClipper clipper;
+            clipper.Begin(256);
+            while(clipper.Step())
+            {
+                for (uint_16 row = clipper.DisplayStart; row < clipper.DisplayEnd; row++)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImU32 cellBgColor = ImGui::GetColorU32(ImVec4(0.9f, 0.9f, 0.9f, 0.65f));
+                    ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
+                    ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f) ,"0x%02X", row);
+
+                    for (int col = 0; col < 16; col++)
+                    {
+                        // ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+                        ImGui::TableSetColumnIndex(col + 1);
+
+                        if (chip8.PrevPC == (col + row*16) || chip8.PrevPC == (col + row*16)-1)
+                        {
+                            // Highlight previous PC
+                            cellBgColor = ImGui::GetColorU32(ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
+                            ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f) ,"0x%02X", chip8.getRAM()[col + row*16]);
+                            ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
+                        }
+                        else if (chip8.getPC() == (col + row*16) || chip8.getPC() == (col + row*16)-1)
+                        {
+                            // Highlight current PC
+                            cellBgColor = ImGui::GetColorU32(ImVec4(0.3f, 0.3f, 0.7f, 0.65f));
+                            ImGui::Text("0x%02X", chip8.getRAM()[col + row*16]);
+                            ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
+                        }
+                        else
+                        {
+                            ImGui::Text("0x%02X", chip8.getRAM()[col + row*16]);
+                        }
+                    }
+                }
+
+            }
+            ImGui::EndTable();
+        }
+        ImGui::End();
+    }
+
     /// @brief Render the UI and emulation display
     void renderUI(Chip8 &chip8)
     {
@@ -154,327 +478,24 @@ public:
         ImGui::NewFrame();
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
         // Set ImGui window to match viewport (SDL window)
-        int currWindowWIdth, currWindowHeight;
-        SDL_GetWindowSizeInPixels(window, &currWindowWIdth, &currWindowHeight);
-        ImGui::SetNextWindowSize(ImVec2(currWindowWIdth, currWindowHeight));
-        // ImVec2 availSize = ImVec2((float)currWindowWIdth, (float)currWindowHeight);
+        int currWindowWidth, currWindowHeight;
+        SDL_GetWindowSizeInPixels(window, &currWindowWidth, &currWindowHeight);
+        ImGui::SetNextWindowSize(ImVec2(currWindowWidth, currWindowHeight));
+        // ImVec2 availSize = ImVec2((float)currWindowWidth, (float)currWindowHeight);
 
-        ImGui::Begin("UI", NULL, flags);
         // Debug UI
         if (debugUI)
         {
-            // Left side (emulation, registers)
-            ImGui::BeginGroup();
-            {
-                if (ImGui::Button("Open ROM"))
-                {
-                    // File dialog open
-                    nfdu8char_t *outPath;
-                    nfdu8filteritem_t filters[1] = { { "ROMs", "ch8" }};
-                    nfdopendialogu8args_t args = {0};
-                    args.filterList = filters;
-                    args.filterCount = 1;
-                    nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
-                    if (result == NFD_OKAY)
-                    {
-                        puts("Success!");
-                        puts(outPath);
-                        if (chip8.loadROM(outPath))
-                        {
-                            puts("ROM loaded sucessfully");
-                        }
-                        NFD_FreePathU8(outPath);
-                    }
-                    else if (result == NFD_CANCEL)
-                    {
-                        puts("User pressed cancel.");
-                    }
-                    else 
-                    {
-                        printf("Error: %s\n", NFD_GetError());
-                    }
-                }
-                ImGui::SameLine();
-                if (!debugPause)
-                {
-                    if (ImGui::Button("Pause Emulation"))
-                    {
-                        debugPause = true;
-                    }
-                } 
-                else
-                {
-                    if (ImGui::Button("Resume Emulation"))
-                    {
-                        debugPause = false;
-                    }
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Next Cycle"))
-                {
-                    debugNextCycle = true;
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Save State"))
-                {
-                    saveNewState = true;
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Load Save State"))
-                {
-                    loadSaveState = true;
-                }
-                ImGui::SameLine();
-                if (ImGui::BeginMenu("Settings"))
-                {
-                    if (ImGui::CollapsingHeader("Emulation", ImGuiTreeNodeFlags_None))                    
-                    {
-                        ImGui::SliderInt("Cycle Delay", &chip8.CycleDelay, 0, 128);
-                        ImGui::SetItemTooltip("Min delay between cycles (in ms)");
-                        ImGui::Checkbox("Shift Vy", &chip8.ConfigShift);
-                        ImGui::SetItemTooltip("Off - CHIP-8 functionality\nOn - CHIP-48 & SCHIP functionality");
-                        ImGui::Checkbox("Jump W/ Offset", &chip8.ConfigJumpWOffset);
-                        ImGui::SetItemTooltip("Off - CHIP-8 functionality\nOn - CHIP-48 & SCHIP functionality");
-                    }
-                    if (ImGui::CollapsingHeader("Display", ImGuiTreeNodeFlags_None))
-                    {
-                        ImGui::Text("Display size:");
-                        ImGui::SameLine();
-                        if (ImGui::Button("1x")) textureScale = 1;
-                        ImGui::SameLine();
-                        if (ImGui::Button("2x")) textureScale = 2;
-                        ImGui::SameLine();
-                        if (ImGui::Button("4x")) textureScale = 4;
-                        ImGui::SameLine();
-                        if (ImGui::Button("8x")) textureScale = 8;
-                        ImGui::SameLine();
-                        if (ImGui::Button("16x")) textureScale = 16;
-
-                        ImGuiColorEditFlags colorFlags = ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreview;
-                        if (!debugPause) colorFlags |= ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoDragDrop;
-                        ImGui::SetItemTooltip("NOTE: Set color only when emulation is paused");
-                        ImGui::ColorPicker4("On Color", &onColorRef.x, colorFlags);
-                        ImGui::SetItemTooltip("NOTE: Set color only when emulation is paused");
-                        ImGui::ColorPicker4("Off Color", &offColorRef.x, colorFlags);
-
-                    }
-                    ImGui::EndMenu();
-                }
-                // ImGui::PopItemWidth();
-                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "V0.74");
-
-                // CHIP-8 display
-                ImGui::Image((void*)texture, ImVec2(textureWidth*textureScale, textureHeight*textureScale));
-
-                 // Prev values
-                ImGui::BeginGroup();
-                {
-                    ImGui::Text("Prev PC: %04X", chip8.PrevPC);
-                    ImGui::Text("Prev I: %04X", chip8.PrevI);
-                    ImGui::Text("Prev SP: %04X", chip8.PrevSP);
-                    ImGui::Text("Prev Opcode: %04X", chip8.PrevOpcode);
-                    ImGui::EndGroup();
-                }
-                ImGui::SameLine();
-                // Curr values
-                ImGui::BeginGroup();
-                {
-                    ImGui::Text("Curr PC: %04X", chip8.getPC());
-                    ImGui::Text("Curr I: %04X", chip8.getI());
-                    ImGui::Text("Curr SP: %04X", chip8.getSP());
-                    ImGui::Text("Curr Opcode: %04X", chip8.getOpcode());
-                    ImGui::EndGroup();
-                }
-
-                // Registers table config
-                ImVec2 vOuterSize = ImVec2(200.0f, 50.0f);
-                // Prev V
-                ImGui::BeginGroup();
-                {
-                    ImGui::Text("Prev Registers");
-                    if (ImGui::BeginTable("Prev V", 2,
-                            (ImGuiTableFlags_RowBg |
-                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
-                    {
-                        ImGui::TableSetupColumn("V");
-                        ImGui::TableSetupColumn("Value");
-                        ImGui::TableHeadersRow();
-                        for (uint_16 row = 0; row < 16; row++)
-                        {
-                            ImGui::TableNextRow();
-                            ImGui::TableSetColumnIndex(0);
-                            ImGui::Text("V[0x%1X]", row);
-                            ImGui::TableSetColumnIndex(1);
-                            ImGui::Text("0x%02X", chip8.PrevV[row]);
-        
-                        }
-                        ImGui::EndTable();
-                    }
-                    ImGui::EndGroup();
-                }
-                ImGui::SameLine();
-                // Curr V
-                ImGui::BeginGroup();
-                {
-                    ImGui::Text("Curr Registers");
-                    if (ImGui::BeginTable("Curr V", 2,
-                            (ImGuiTableFlags_RowBg |
-                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
-                    {
-                        ImGui::TableSetupColumn("V");
-                        ImGui::TableSetupColumn("Value");
-                        ImGui::TableHeadersRow();
-                        for (uint_16 row = 0; row < 16; row++)
-                        {
-                            ImGui::TableNextRow();
-                            ImGui::TableSetColumnIndex(0);
-                            ImGui::Text("V[0x%X]", row);
-                            ImGui::TableSetColumnIndex(1);
-                            if (chip8.getVs()[row] != chip8.PrevV[row])
-                            {
-                                ImU32 cellBgColor = ImGui::GetColorU32(ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
-                                ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
-                                ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f) ,"0x%02X", chip8.getVs()[row]);
-                            }
-                            else
-                            {
-                                ImGui::Text("0x%02X", chip8.getVs()[row]);
-                            }
-        
-                        }
-                        ImGui::EndTable();
-                    }
-                    ImGui::EndGroup();
-                }
-                ImGui::SameLine();
-                // Prev Stack
-                ImGui::BeginGroup();
-                {
-                    ImGui::Text("Prev Stack");
-                    if (ImGui::BeginTable("Prev Stack", 2,
-                            (ImGuiTableFlags_RowBg |
-                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
-                    {
-                        ImGui::TableSetupColumn("Stack");
-                        ImGui::TableSetupColumn("Value");
-                        ImGui::TableHeadersRow();
-                        for (uint_16 row = 0; row < 16; row++)
-                        {
-                            ImGui::TableNextRow();
-                            ImGui::TableSetColumnIndex(0);
-                            ImGui::Text("Stack[0x%1X]", row);
-                            ImGui::TableSetColumnIndex(1);
-                            ImGui::Text("0x%02X", chip8.PrevStack[row]);
-        
-                        }
-                        ImGui::EndTable();
-                    }
-                    ImGui::EndGroup();
-                }
-                ImGui::SameLine();
-                // Curr Stack
-                ImGui::BeginGroup();
-                {
-                    ImGui::Text("Curr Stack");
-                    if (ImGui::BeginTable("Curr Stack", 2,
-                            (ImGuiTableFlags_RowBg |
-                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
-                    {
-                        ImGui::TableSetupColumn("Stack");
-                        ImGui::TableSetupColumn("Value");
-                        ImGui::TableHeadersRow();
-                        for (uint_16 row = 0; row < 16; row++)
-                        {
-                            ImGui::TableNextRow();
-                            ImGui::TableSetColumnIndex(0);
-                            ImGui::Text("Stack[0x%X]", row);
-                            ImGui::TableSetColumnIndex(1);
-                            if (chip8.getStack()[row] != chip8.PrevStack[row])
-                            {
-                                ImU32 cellBgColor = ImGui::GetColorU32(ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
-                                ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
-                                ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f) ,"0x%02X", chip8.getStack()[row]);
-                            }
-                            else
-                            {
-                                ImGui::Text("0x%02X", chip8.getStack()[row]);
-                            }
-        
-                        }
-                        ImGui::EndTable();
-                        ImGui::EndGroup();
-                    }
-                }
-                ImGui::EndGroup();
-
-                // Start for RAM table
-                ImGui::SameLine(currWindowWIdth - (currWindowWIdth/2), 0.0f);
-                // RAM table config
-                ImVec2 ramOuterSize = ImVec2(0.475f * currWindowWIdth, 0.4f * currWindowHeight);
-                // RAM group - keeps "RAM" and the actual table inline vertically
-                ImGui::BeginGroup();
-                {
-                    ImGui::Text("RAM");
-                    if (ImGui::BeginTable("RAM", 17,
-                            (ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
-                            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
-                            ImGuiTableFlags_SizingFixedFit),
-                            ramOuterSize))
-                    {
-
-                        ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthStretch);
-                        for (int col = 0; col < 16; col++)
-                        {
-                            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
-                        }
-                        ImGuiListClipper clipper;
-                        clipper.Begin(256);
-                        while(clipper.Step())
-                        {
-                            for (uint_16 row = clipper.DisplayStart; row < clipper.DisplayEnd; row++)
-                            {
-                                ImGui::TableNextRow();
-                                ImGui::TableSetColumnIndex(0);
-                                ImU32 cellBgColor = ImGui::GetColorU32(ImVec4(0.9f, 0.9f, 0.9f, 0.65f));
-                                ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
-                                ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f) ,"0x%02X", row);
-        
-                                for (int col = 0; col < 16; col++)
-                                {
-                                    // ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
-                                    ImGui::TableSetColumnIndex(col + 1);
-        
-                                    if (chip8.PrevPC == (col + row*16) || chip8.PrevPC == (col + row*16)-1)
-                                    {
-                                        // Highlight previous PC
-                                        cellBgColor = ImGui::GetColorU32(ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
-                                        ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f) ,"0x%02X", chip8.getRAM()[col + row*16]);
-                                        ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
-                                    }
-                                    else if (chip8.getPC() == (col + row*16) || chip8.getPC() == (col + row*16)-1)
-                                    {
-                                        // Highlight current PC
-                                        cellBgColor = ImGui::GetColorU32(ImVec4(0.3f, 0.3f, 0.7f, 0.65f));
-                                        ImGui::Text("0x%02X", chip8.getRAM()[col + row*16]);
-                                        ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
-                                    }
-                                    else
-                                    {
-                                        ImGui::Text("0x%02X", chip8.getRAM()[col + row*16]);
-                                    }
-                                }
-                            }
-        
-                        }
-                        ImGui::EndTable();
-                    }
-                    ImGui::EndGroup();
-                }
-                ImGui::EndGroup();
-            }
+            drawDebugWindow(chip8);
+            
+            // CHIP-8 display
+            drawDisplayWindow();
+            
+            drawRegistersWindow(chip8);
+            
+            drawRAMWindow(chip8);
+            
         }
-        ImGui::End();
-        // End UI
 
         chip8.setOnColor(vec4ToRGBA(onColorRef));
         chip8.setOffColor(vec4ToRGBA(offColorRef));
