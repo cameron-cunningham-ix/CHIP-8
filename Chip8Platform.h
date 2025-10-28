@@ -24,6 +24,13 @@ private:
 public:
     // UI flags
     bool m_ShowEmulationSettings = false;
+    // UI proportions
+    ImVec2 debugWindowProportion = ImVec2(0.25f, 0.45f);
+    ImVec2 displayWindowProportion = ImVec2(0.5f, 0.5f);
+    ImVec2 opcodeWindowProportion = ImVec2(0.25f, 0.5f);
+    ImVec2 ramWindowProportion = ImVec2(0.5f, 0.5f);
+    ImVec2 registersWindowProportion = ImVec2(0.5f, 0.5f);
+
     // Debug flags
     bool debugPause = false;
     bool debugNextCycle = false;
@@ -137,7 +144,7 @@ public:
     {
         NFD_Quit();
         ImGui_ImplSDLRenderer3_Shutdown();
-        ImGui_ImplSDL3_Shutdown();
+        ImGui_ImplSDL3_Shutdown();\
         ImGui::DestroyContext();
         SDL_DestroyTexture(texture);
         SDL_DestroyRenderer(renderer);
@@ -148,17 +155,20 @@ public:
     /// @brief Draw the display / emulation ImGui window
     void drawDisplayWindow()
     {
-        ImGui::SetNextWindowPos(ImVec2(windowWidth/2, 0), ImGuiCond_None);
-        ImGui::SetNextWindowSize(ImVec2(textureWidth*textureScale, textureHeight*textureScale));
-        ImGui::Begin("Display", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
-        ImGui::Image((void*)texture, ImVec2(textureWidth*textureScale, textureHeight*textureScale));
+        ImGui::SetNextWindowPos(ImVec2(windowWidth * displayWindowProportion.x, 0), ImGuiCond_None);
+        ImGui::SetNextWindowSize(ImVec2(windowWidth*displayWindowProportion.x,
+            windowHeight*displayWindowProportion.y));
+        ImGui::Begin("Display", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        ImVec2 windowSize = ImGui::GetWindowSize();
+        ImGui::Image((void*)texture, ImVec2(textureWidth*textureScale,
+            textureHeight*textureScale));
         ImGui::End();
     }
 
     void drawDebugWindow(Chip8 &chip8)
     {
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_None);
-        ImGui::SetNextWindowSize(ImVec2(windowWidth/4, windowHeight/2));
+        ImGui::SetNextWindowSize(ImVec2(windowWidth * debugWindowProportion.x, windowHeight * debugWindowProportion.y));
         ImGui::Begin("Debug", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
         if (ImGui::Button("Open ROM"))
         {
@@ -232,17 +242,17 @@ public:
             }
             if (ImGui::CollapsingHeader("Display", ImGuiTreeNodeFlags_None))
             {
-                ImGui::Text("Display size:");
-                ImGui::SameLine();
-                if (ImGui::Button("1x")) textureScale = 1;
-                ImGui::SameLine();
-                if (ImGui::Button("2x")) textureScale = 2;
-                ImGui::SameLine();
-                if (ImGui::Button("4x")) textureScale = 4;
-                ImGui::SameLine();
-                if (ImGui::Button("8x")) textureScale = 8;
-                ImGui::SameLine();
-                if (ImGui::Button("16x")) textureScale = 16;
+                // ImGui::Text("Display size:");
+                // ImGui::SameLine();
+                // if (ImGui::Button("1x")) textureScale = 1;
+                // ImGui::SameLine();
+                // if (ImGui::Button("2x")) textureScale = 2;
+                // ImGui::SameLine();
+                // if (ImGui::Button("4x")) textureScale = 4;
+                // ImGui::SameLine();
+                // if (ImGui::Button("8x")) textureScale = 8;
+                // ImGui::SameLine();
+                // if (ImGui::Button("16x")) textureScale = 16;
 
                 ImGuiColorEditFlags colorFlags = ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreview;
                 if (!debugPause) colorFlags |= ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoDragDrop;
@@ -259,12 +269,13 @@ public:
         ImGui::End();
     }
 
-    void drawRegistersWindow(Chip8 chip8)
+    void drawOpcodeWindow(Chip8 chip8)
     {
-        ImGui::SetNextWindowPos(ImVec2(windowWidth/6, windowHeight/4), ImGuiCond_None);
-        ImGui::SetNextWindowSize(ImVec2(windowWidth/4, windowHeight/4));
-        ImGui::Begin("Registers", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
-        // Prev values
+        ImGui::SetNextWindowPos(ImVec2(windowWidth * debugWindowProportion.x + 5, 5), ImGuiCond_None);
+        ImGui::SetNextWindowSize(ImVec2(windowWidth * opcodeWindowProportion.x - 5,
+            windowHeight * opcodeWindowProportion.y - 5));
+        ImGui::Begin("Opcode", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+         // Prev values
         ImGui::BeginGroup();
         {
             ImGui::Text("Prev PC: %04X", chip8.PrevPC);
@@ -283,9 +294,18 @@ public:
             ImGui::Text("Curr Opcode: %04X", chip8.getOpcode());
             ImGui::EndGroup();
         }
+        ImGui::End();
+    }
+
+    void drawRegistersWindow(Chip8 chip8)
+    {
+        ImGui::SetNextWindowPos(ImVec2(windowWidth * registersWindowProportion.x, windowHeight * registersWindowProportion.y), ImGuiCond_None);
+        ImGui::SetNextWindowSize(ImVec2(windowWidth/2, windowHeight/2));
+        ImGui::Begin("Registers", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+       
 
         // Registers table config
-        ImVec2 vOuterSize = ImVec2(200.0f, 50.0f);
+        ImVec2 vOuterSize = ImVec2(110.0f, 50.0f);
         // Prev V
         ImGui::BeginGroup();
         {
@@ -345,13 +365,14 @@ public:
             ImGui::EndGroup();
         }
         ImGui::SameLine();
+        ImVec2 stackOuterSize = ImVec2(140.0f, 50.0f);
         // Prev Stack
         ImGui::BeginGroup();
         {
             ImGui::Text("Prev Stack");
             if (ImGui::BeginTable("Prev Stack", 2,
                     (ImGuiTableFlags_RowBg |
-                    ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
+                    ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), stackOuterSize))
             {
                 ImGui::TableSetupColumn("Stack");
                 ImGui::TableSetupColumn("Value");
@@ -376,7 +397,7 @@ public:
             ImGui::Text("Curr Stack");
             if (ImGui::BeginTable("Curr Stack", 2,
                     (ImGuiTableFlags_RowBg |
-                    ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), vOuterSize))
+                    ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedSame), stackOuterSize))
             {
                 ImGui::TableSetupColumn("Stack");
                 ImGui::TableSetupColumn("Value");
@@ -410,7 +431,9 @@ public:
     void drawRAMWindow(Chip8 chip8)
     {
         // RAM table config
-        ImVec2 ramOuterSize = ImVec2(0.475f * windowWidth, 0.4f * windowHeight);
+        ImGui::SetNextWindowPos(ImVec2(0, windowHeight * ramWindowProportion.y), ImGuiCond_None);
+        ImVec2 ramOuterSize = ImVec2(windowWidth * ramWindowProportion.x, windowHeight * ramWindowProportion.y);
+        ImGui::SetNextWindowSize(ramOuterSize);
         // RAM group - keeps "RAM" and the actual table inline vertically
         ImGui::Begin("RAM", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
         if (ImGui::BeginTable("RAM", 17,
@@ -479,8 +502,8 @@ public:
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
         // Set ImGui window to match viewport (SDL window)
         int currWindowWidth, currWindowHeight;
-        SDL_GetWindowSizeInPixels(window, &currWindowWidth, &currWindowHeight);
-        ImGui::SetNextWindowSize(ImVec2(currWindowWidth, currWindowHeight));
+        SDL_GetWindowSizeInPixels(window, &windowWidth, &windowHeight);
+        // ImGui::SetNextWindowSize(ImVec2(currWindowWidth, currWindowHeight));
         // ImVec2 availSize = ImVec2((float)currWindowWidth, (float)currWindowHeight);
 
         // Debug UI
@@ -494,6 +517,8 @@ public:
             drawRegistersWindow(chip8);
             
             drawRAMWindow(chip8);
+
+            drawOpcodeWindow(chip8);
             
         }
 
