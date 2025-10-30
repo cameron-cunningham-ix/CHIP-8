@@ -42,6 +42,7 @@ public:
     int textureScale = 8;
     ImVec4 onColorRef = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     ImVec4 offColorRef = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
+    float cyclesPerFrame = 1.0f;
 
     /// @brief 
     /// @param title Title of SDL window created, appears at top
@@ -233,7 +234,7 @@ public:
         {
             if (ImGui::CollapsingHeader("Emulation", ImGuiTreeNodeFlags_None))                    
             {
-                ImGui::SliderInt("Cycle Delay", &chip8.CycleDelay, 0, 128);
+                ImGui::SliderFloat("Cycle Delay", &cyclesPerFrame, 0.01f, 40096.0f);
                 ImGui::SetItemTooltip("Min delay between cycles (in ms)");
                 ImGui::Checkbox("Shift Vy", &chip8.ConfigShift);
                 ImGui::SetItemTooltip("Off - CHIP-8 functionality\nOn - CHIP-48 & SCHIP functionality");
@@ -305,7 +306,7 @@ public:
        
 
         // Registers table config
-        ImVec2 vOuterSize = ImVec2(110.0f, 50.0f);
+        ImVec2 vOuterSize = ImVec2(160.0f, 50.0f);
         // Prev V
         ImGui::BeginGroup();
         {
@@ -520,10 +521,11 @@ public:
 
             drawOpcodeWindow(chip8);
             
+            if (chip8.OnColor != vec4ToRGBA(onColorRef))
+                chip8.setOnColor(vec4ToRGBA(onColorRef));
+            if (chip8.OffColor != vec4ToRGBA(offColorRef))
+                chip8.setOffColor(vec4ToRGBA(offColorRef));
         }
-
-        chip8.setOnColor(vec4ToRGBA(onColorRef));
-        chip8.setOffColor(vec4ToRGBA(offColorRef));
 
         // Copy data from frameBuffer into texture
         if (chip8.DrawFlag)
@@ -561,16 +563,6 @@ public:
                 frameBuffer[c] = display[j + i*textureWidth];
             }
         }
-    }
-
-    unsigned int vec4ToRGBA(ImVec4 vec4)
-    {
-        unsigned int r = vec4.x * 255;
-        unsigned int g = vec4.y * 255;
-        unsigned int b = vec4.z * 255;
-        unsigned int a = vec4.w * 255;
-        unsigned int val = (r << 24) | g << 16 | b << 8 | a;
-        return val;
     }
 
     /// @brief Process input events for CHIP-8
@@ -729,5 +721,15 @@ public:
         }
         
         return quit;
+    }
+
+    unsigned int vec4ToRGBA(ImVec4 vec4)
+    {
+        unsigned int r = vec4.x * 255;
+        unsigned int g = vec4.y * 255;
+        unsigned int b = vec4.z * 255;
+        unsigned int a = vec4.w * 255;
+        unsigned int val = (r << 24) | g << 16 | b << 8 | a;
+        return val;
     }
 };

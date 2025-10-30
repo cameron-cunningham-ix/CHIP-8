@@ -24,7 +24,9 @@ int main(int argc, char *argv[])
     // CHIP-8 to load for save state
     Chip8 saveStateChip8;
     
-    clock_t lastCycleTime = clock();
+    clock_t lastFrameTime = clock();
+
+    double frameTime = 1.0 / platform.cyclesPerFrame;
 
     // Continue running program
     bool done = false;
@@ -32,24 +34,30 @@ int main(int argc, char *argv[])
     // Emulate next cycle
     while (!done)
     {   
+        frameTime = 1.0 / platform.cyclesPerFrame;
+
         done = platform.processInput(chip8.Keys, chip8.PrevKeys, platform.debugPause, platform.debugNextCycle);
 
-        clock_t currentTime = clock();
-        float deltaTime = (currentTime - lastCycleTime);
+        double deltaTime = (clock() - lastFrameTime);
 
-        if ((deltaTime > chip8.CycleDelay && !platform.debugPause) || (platform.debugPause &&  platform.debugNextCycle && deltaTime > chip8.CycleDelay*8))
+        while ((deltaTime < frameTime && !platform.debugPause) || (platform.debugPause &&  platform.debugNextCycle))
         {
-            lastCycleTime = currentTime;
+            // lastFrameTime = currentTime;
+            deltaTime = (clock() - lastFrameTime);
             chip8.cycle();
+            platform.debugNextCycle = false;    // This gets set in renderUI
         }
         
-        platform.debugNextCycle = false;    // This gets set in renderUI
+        // platform.debugNextCycle = false;    // This gets set in renderUI
         if (chip8.DrawFlag)
         {
             platform.writeToBuffer(chip8.Display);
         }
         
         platform.renderUI(chip8);
+        chip8.DrawFlag = false;
+
+        lastFrameTime = clock();
 
         // Load & Save state
         if (platform.saveNewState)

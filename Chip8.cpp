@@ -168,7 +168,7 @@ void Chip8::cycle()
     Vx = (Opcode & 0x0F00) >> 8;    // Register x, not value in Vx
     Vy = (Opcode & 0x00F0) >> 4;    // Register y, not value in Vy
     // Reset DrawFlag
-    DrawFlag = 0;
+    // DrawFlag = 0;
 
     // Decode and Execute
     // Indexes the FnTable holding the function pointers for opcodes
