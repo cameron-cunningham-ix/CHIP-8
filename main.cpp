@@ -24,8 +24,6 @@ int main(int argc, char *argv[])
     // CHIP-8 to load for save state
     Chip8 saveStateChip8;
     
-    clock_t lastCycleTime = clock();
-
     // Continue running program
     bool done = false;
     // CHIP-8 cycles paused
@@ -34,22 +32,43 @@ int main(int argc, char *argv[])
     {   
         done = platform.processInput(chip8.Keys, chip8.PrevKeys, platform.debugPause, platform.debugNextCycle);
 
-        clock_t currentTime = clock();
-        float deltaTime = (currentTime - lastCycleTime);
-
-        if ((deltaTime > chip8.CycleDelay && !platform.debugPause) || (platform.debugPause &&  platform.debugNextCycle && deltaTime > chip8.CycleDelay*8))
+        int cyclesThisFrame = 0;
+        if (platform.debugPause)
         {
-            lastCycleTime = currentTime;
+            // If paused, only run when stepping
+            cyclesThisFrame = platform.debugNextCycle ? 1 : 0;
+        }
+        else
+        {
+            cyclesThisFrame = platform.cyclesPerFrame;
+        }
+
+        for (int i = 0; i < cyclesThisFrame; i++)
+        {
             chip8.cycle();
         }
+        platform.debugNextCycle = false;
         
-        platform.debugNextCycle = false;    // This gets set in renderUI
+        // Decrement timers at 60Hz
+        static Uint64 lastTimerUpdate = SDL_GetTicks();
+        Uint64 currentTicks = SDL_GetTicks();
+
+        if (currentTicks - lastTimerUpdate >= 16) // Approx 60Hz
+        {
+            if (chip8.DelayTimer > 0)
+                chip8.DelayTimer--;
+            if (chip8.SoundTimer > 0)
+                chip8.SoundTimer--;
+            lastTimerUpdate = currentTicks;
+        }
+
         if (chip8.DrawFlag)
         {
             platform.writeToBuffer(chip8.Display);
         }
         
         platform.renderUI(chip8);
+        chip8.DrawFlag = false;
 
         // Load & Save state
         if (platform.saveNewState)

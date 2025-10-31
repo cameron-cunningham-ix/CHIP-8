@@ -102,7 +102,7 @@ public:
     // Configuration
     // Used for ambiguous instructions, i.e. instructions that change between CHIP-8 and SUPER-CHIP.
     // 0 - CHIP-8   1 - SUPER-CHIP
-    int CycleDelay = 1;
+    // int CycleDelay = 1;
     bool ConfigShift;
     bool ConfigJumpWOffset;
     // Styling
@@ -129,11 +129,11 @@ public:
     const uint_16 getI() const { return I; }
     const uint_16 getOpcode() const { return Opcode; }
     const uint_16 getOpcodeAt(uint_16 addr) const { return (RAM[addr] << 8) | RAM[addr + 1]; }
-    const uint_8& getKeys() const { return *Keys; }
-    const uint_8& getPrevKeys() const { return *PrevKeys; }
+    const uint_8* getKeys() const { return Keys; }
+    const uint_8* getPrevKeys() const { return PrevKeys; }
     const uint_8 getSoundTimer() const { return SoundTimer; }
     const uint_8 getDelayTimer() const { return DelayTimer; }
-    const unsigned int& getDisplay() const { return *Display; }
+    const unsigned int* getDisplay() const { return Display; }
     const char* getOpcodeDescription(uint_16 opcode);
 
     // Function pointer alias for Opcode FP tables

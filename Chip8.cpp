@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <stdint.h>
 #include <string.h>
+#include <iostream>
 #include <random>
 #include <time.h>
 
@@ -69,6 +70,8 @@ Chip8::Chip8() {
     FnTableF[0x33] = &Chip8::op_fx33;
     FnTableF[0x55] = &Chip8::op_fx55;
     FnTableF[0x65] = &Chip8::op_fx65;
+
+    initialize();
 }
 
 Chip8::~Chip8() {}
@@ -168,17 +171,11 @@ void Chip8::cycle()
     Vx = (Opcode & 0x0F00) >> 8;    // Register x, not value in Vx
     Vy = (Opcode & 0x00F0) >> 4;    // Register y, not value in Vy
     // Reset DrawFlag
-    DrawFlag = 0;
+    // DrawFlag = 0;
 
     // Decode and Execute
     // Indexes the FnTable holding the function pointers for opcodes
     ((*this).*(FnTable[Nib1 >> 12]))();
-
-    // Decrement delay and sound timers
-    if (DelayTimer > 0)
-        DelayTimer--;
-    if (SoundTimer > 0)
-        SoundTimer--;
 }
 
 /// @brief Set the 'on' color and write it to display
@@ -208,18 +205,38 @@ void Chip8::setOffColor(unsigned int color)
 // Table functions
 void Chip8::Table0()
 {
+    if (Nib2 > 0xE)
+    {
+        std::cerr << "Unknown opcode: " << std::hex << Opcode << std::dec << "\n";
+        return;
+    }
     ((*this).*(FnTable0[Nib2]))();
 }
 void Chip8::Table8()
 {
+    if (Nib2 > 0xE)
+    {
+        std::cerr << "Unknown opcode: " << std::hex << Opcode << std::dec << "\n";
+        return;
+    }
     ((*this).*(FnTable8[Nib2]))();
 }
 void Chip8::TableE()
 {
+    if (Nib2 > 0xE)
+    {
+        std::cerr << "Unknown opcode: " << std::hex << Opcode << std::dec << "\n";
+        return;
+    }
     ((*this).*(FnTableE[Nib2]))();
 }
 void Chip8::TableF()
 {
+    if ((Opcode & 0x00FF) > 0x65)
+    {
+        std::cerr << "Unknown opcode: " << std::hex << Opcode << std::dec << "\n";
+        return;
+    }
     // Table F relies on last byte for indexing rather than nibble
     ((*this).*(FnTableF[Opcode & 0x00FF]))();
 }
@@ -512,4 +529,6 @@ void Chip8::op_fx65()
 /// @brief Default function if opcode doesn't exist
 void Chip8::op_null()
 {
+    std::cerr << "Unknown opcode: " << std::hex << Opcode << std::dec << "\n";
+    return;
 }
