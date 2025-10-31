@@ -7,6 +7,10 @@ A CHIP-8 interpreter / "emulator" written in C++
 CHIP8.exe <br>
 
 <h2>HISTORY:</h2><br>
+<b>v0.76</b> - Added Reset ROM button <br>
+- Added target frame rate slider <br>
+- Fixed bug of not being able to load save state <br>
+<br>
 <b>v0.75</b> - Removed timer decrement from Chip8 cycle function and placed them in main, always running at ~60Hz. This is the correct implementation; some games do use the timers to run their games at a consistent FPS regardless of number of cycles run. <br>
 - Added checks for OOB accesses in function table decoders. <br>
 - Removed CycleDelay from Chip8 and replaced it with cyclesPerFrame in Chip8Platform; changed main to correspond. Emulation now can run set number of cycles per frame, instead of running max one cycle per frame. <br>

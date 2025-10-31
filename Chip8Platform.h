@@ -6,6 +6,7 @@
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_main.h"
 #include "nfd.h"
+#include <cmath>
 
 /// @brief SDL + ImGui platform for CHIP-8 rendering and input
 class Chip8Platform
@@ -37,12 +38,15 @@ public:
     bool debugUI = true;
     bool saveNewState = false;
     bool loadSaveState = false;
+    bool haveSavedState = false;
     // Platform
     float mainScale;
     int textureScale = 8;
     ImVec4 onColorRef = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     ImVec4 offColorRef = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
     int cyclesPerFrame = 1;
+    float frameRate = 60.0f;
+    char* currentROMPath = nullptr;
 
     /// @brief 
     /// @param title Title of SDL window created, appears at top
@@ -181,6 +185,13 @@ public:
                 if (chip8.loadROM(outPath))
                 {
                     puts("ROM loaded sucessfully");
+                    // Free previous path
+                    if (currentROMPath)
+                    {
+                        free(currentROMPath);
+                    }
+                    // Store current path
+                    currentROMPath = strdup(outPath);
                 }
                 NFD_FreePathU8(outPath);
             }
@@ -194,6 +205,17 @@ public:
             }
         }
         // ImGui::SameLine();
+        // Reset ROM
+        if (ImGui::Button("Reset ROM"))
+        {
+            if (currentROMPath)
+            {
+                if (chip8.loadROM(currentROMPath))
+                {
+                    puts("ROM reset sucessfully");
+                }
+            }
+        }
         if (!debugPause)
         {
             if (ImGui::Button("Pause Emulation"))
@@ -217,28 +239,51 @@ public:
         if (ImGui::Button("Save State"))
         {
             saveNewState = true;
+            haveSavedState = true;
         }
         // ImGui::SameLine();
         if (ImGui::Button("Load Save State"))
         {
-            loadSaveState = true;
+            // Only load if we have a saved state
+            if (haveSavedState)
+            {
+                loadSaveState = true;
+            }
         }
         // ImGui::SameLine();
         if (ImGui::BeginMenu("Settings"))
         {
-            if (ImGui::CollapsingHeader("Emulation", ImGuiTreeNodeFlags_None))                    
+            if (ImGui::CollapsingHeader("Emulation", ImGuiTreeNodeFlags_None))
             {
                 ImGui::SliderInt("Cycles Per Frame", &cyclesPerFrame, 1, 256);
                 ImGui::SetItemTooltip("Number of cycles emulated in 1 frame");
                 ImGui::SameLine();
-                if (ImGui::Button("-"))
+                if (ImGui::Button("-##Cycles"))
                 {
                     if (cyclesPerFrame > 1) cyclesPerFrame--;
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("+"))
+                if (ImGui::Button("+##Cycles"))
                 {
                     cyclesPerFrame++;
+                }
+                if (ImGui::SliderFloat("Frame Rate", &frameRate, 25.0f, 120.0f))
+                {
+                    // Snap value to integer
+                    frameRate = std::round(frameRate);
+                    // Clamp to valid range
+                    frameRate = std::fmax(25.0f, std::fmin(120.0f, frameRate));
+                }
+                ImGui::SetItemTooltip("Target frame rate for emulation");
+                ImGui::SameLine();
+                if (ImGui::Button("-##Frames"))
+                {
+                    if (frameRate > 25) frameRate--;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("+##Frames"))
+                {
+                    if (frameRate < 120) frameRate++;
                 }
                 ImGui::Checkbox("Shift Vy", &chip8.ConfigShift);
                 ImGui::SetItemTooltip("Off - CHIP-8 functionality\nOn - CHIP-48 & SCHIP functionality");
@@ -249,14 +294,14 @@ public:
             {
                 ImGui::Text("Display size:");
                 ImGui::SameLine();
-                if (ImGui::Button("-"))
+                if (ImGui::Button("-##Display"))
                 {
                     if (textureScale > 1) textureScale--;
                 }
                 ImGui::SameLine();
                 ImGui::Text("%dx%d", textureWidth * textureScale, textureHeight * textureScale);
                 ImGui::SameLine();
-                if (ImGui::Button("+"))
+                if (ImGui::Button("+##Display"))
                 {
                     textureScale++;
                 }
@@ -319,6 +364,12 @@ public:
             ImGui::Text("Curr Opcode: %04X", chip8.getOpcode());
             ImGui::EndGroup();
         }
+
+        // Display target frame rate and actual frame rate
+        ImGui::Separator();
+        ImGui::Text("Target Frame Rate: %.1f FPS", frameRate);
+        ImGui::Text("Actual Frame Rate: %.1f FPS", ImGui::GetIO().Framerate);
+
         ImGui::End();
     }
 
@@ -327,9 +378,9 @@ public:
         ImGui::SetNextWindowPos(ImVec2(windowWidth * registersWindowProportion.x, windowHeight * registersWindowProportion.y), ImGuiCond_None);
         ImGui::SetNextWindowSize(ImVec2(windowWidth/2, windowHeight/2));
         ImGui::Begin("Registers", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
-       
+        float fontSize = ImGui::GetFontSize();
         // Registers table config
-        ImVec2 vOuterSize = ImVec2(100.0f * mainScale, 50.0f * mainScale);
+        ImVec2 vOuterSize = ImVec2(6.0f * fontSize, 16.0f * fontSize);
         // Prev V
         ImGui::BeginGroup();
         {
@@ -389,7 +440,7 @@ public:
             ImGui::EndGroup();
         }
         ImGui::SameLine();
-        ImVec2 stackOuterSize = ImVec2(140.0f * mainScale, 50.0f * mainScale);
+        ImVec2 stackOuterSize = ImVec2(8.0f * mainScale * fontSize, 16.0f * fontSize);
         // Prev Stack
         ImGui::BeginGroup();
         {
@@ -566,6 +617,18 @@ public:
         {
             SDL_RenderTexture(renderer, texture, NULL, NULL);
         }
+
+        // Try to render UI at target frame rate
+        static Uint64 lastFrameTime = SDL_GetTicks();
+        Uint64 frameStartTime = SDL_GetTicks();
+        Uint64 frameDuration = frameStartTime - lastFrameTime;
+        Uint64 targetFrameDuration = static_cast<Uint64>(1000.0f / frameRate);
+        if (frameDuration < targetFrameDuration)
+        {
+            SDL_Delay(static_cast<Uint32>(targetFrameDuration - frameDuration));
+        }
+        lastFrameTime = SDL_GetTicks();
+
         ImGui::Render();
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
         SDL_RenderPresent(renderer);
