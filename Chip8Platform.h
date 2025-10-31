@@ -25,14 +25,14 @@ public:
     // UI flags
     bool m_ShowEmulationSettings = false;
     // UI proportions
-    ImVec2 debugWindowProportion = ImVec2(0.25f, 0.45f);
+    ImVec2 debugWindowProportion = ImVec2(0.25f, 0.5f);
     ImVec2 displayWindowProportion = ImVec2(0.5f, 0.5f);
     ImVec2 opcodeWindowProportion = ImVec2(0.25f, 0.5f);
     ImVec2 ramWindowProportion = ImVec2(0.5f, 0.5f);
     ImVec2 registersWindowProportion = ImVec2(0.5f, 0.5f);
 
     // Debug flags
-    bool debugPause = false;
+    bool debugPause = true;         // Start paused
     bool debugNextCycle = false;
     bool debugUI = true;
     bool saveNewState = false;
@@ -42,7 +42,7 @@ public:
     int textureScale = 8;
     ImVec4 onColorRef = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     ImVec4 offColorRef = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
-    float cyclesPerFrame = 1.0f;
+    int cyclesPerFrame = 1;
 
     /// @brief 
     /// @param title Title of SDL window created, appears at top
@@ -111,24 +111,16 @@ public:
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 
-        // io.DisplaySize.x = (float)(windowWidth*mainScale);
-        // io.DisplaySize.y = (float)(windowHeight*mainScale);
-
         ImFontConfig fontConfig;
-        fontConfig.SizePixels = 14.0f * mainScale;
-        io.Fonts->AddFontDefault(&fontConfig);
-        // io.Fonts->Build();
+        ImFont* roboto = io.Fonts->AddFontFromFileTTF("fonts/Roboto/Roboto-Regular.ttf", 16.0f * mainScale, &fontConfig);
 
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
-        // ImGui::StyleColorsLight();
 
         // Setup scaling
         ImGuiStyle& style = ImGui::GetStyle();
         style.ScaleAllSizes(mainScale);        // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this requires resetting Style + calling this again)
         style.FontScaleDpi = mainScale;        // Set initial font scale. (using io.ConfigDpiScaleFonts=true makes this unnecessary. We leave both here for documentation purpose)
-        //io.ConfigDpiScaleFonts = true;        // [Experimental] Automatically overwrite style.FontScaleDpi in Begin() when Monitor DPI changes. This will scale fonts but _NOT_ scale sizes/padding for now.
-        //io.ConfigDpiScaleViewports = true;    // [Experimental] Scale Dear ImGui and Platform Windows when Monitor DPI changes.
 
         // Setup Platform/Renderer backends
         ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
@@ -145,7 +137,7 @@ public:
     {
         NFD_Quit();
         ImGui_ImplSDLRenderer3_Shutdown();
-        ImGui_ImplSDL3_Shutdown();\
+        ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
         SDL_DestroyTexture(texture);
         SDL_DestroyRenderer(renderer);
@@ -166,7 +158,9 @@ public:
         ImGui::End();
     }
 
-    void drawDebugWindow(Chip8 &chip8)
+    /// @brief Draw debug menu window (load ROM, pause, settings, etc.)
+    /// @param chip8 
+    void drawDebugMenuWindow(Chip8 &chip8)
     {
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_None);
         ImGui::SetNextWindowSize(ImVec2(windowWidth * debugWindowProportion.x, windowHeight * debugWindowProportion.y));
@@ -234,8 +228,18 @@ public:
         {
             if (ImGui::CollapsingHeader("Emulation", ImGuiTreeNodeFlags_None))                    
             {
-                ImGui::SliderFloat("Cycle Delay", &cyclesPerFrame, 0.01f, 40096.0f);
-                ImGui::SetItemTooltip("Min delay between cycles (in ms)");
+                ImGui::SliderInt("Cycles Per Frame", &cyclesPerFrame, 1, 256);
+                ImGui::SetItemTooltip("Number of cycles emulated in 1 frame");
+                ImGui::SameLine();
+                if (ImGui::Button("-"))
+                {
+                    if (cyclesPerFrame > 1) cyclesPerFrame--;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("+"))
+                {
+                    cyclesPerFrame++;
+                }
                 ImGui::Checkbox("Shift Vy", &chip8.ConfigShift);
                 ImGui::SetItemTooltip("Off - CHIP-8 functionality\nOn - CHIP-48 & SCHIP functionality");
                 ImGui::Checkbox("Jump W/ Offset", &chip8.ConfigJumpWOffset);
@@ -243,17 +247,38 @@ public:
             }
             if (ImGui::CollapsingHeader("Display", ImGuiTreeNodeFlags_None))
             {
-                // ImGui::Text("Display size:");
-                // ImGui::SameLine();
-                // if (ImGui::Button("1x")) textureScale = 1;
-                // ImGui::SameLine();
-                // if (ImGui::Button("2x")) textureScale = 2;
-                // ImGui::SameLine();
-                // if (ImGui::Button("4x")) textureScale = 4;
-                // ImGui::SameLine();
-                // if (ImGui::Button("8x")) textureScale = 8;
-                // ImGui::SameLine();
-                // if (ImGui::Button("16x")) textureScale = 16;
+                ImGui::Text("Display size:");
+                ImGui::SameLine();
+                if (ImGui::Button("-"))
+                {
+                    if (textureScale > 1) textureScale--;
+                }
+                ImGui::SameLine();
+                ImGui::Text("%dx%d", textureWidth * textureScale, textureHeight * textureScale);
+                ImGui::SameLine();
+                if (ImGui::Button("+"))
+                {
+                    textureScale++;
+                }
+
+                ImGui::Text("Font Scale:");
+                ImGui::SameLine();
+                if (ImGui::Button("-##Font"))
+                {
+                    if (mainScale > 1.0f) 
+                    {
+                        mainScale -= 0.1f;
+                        ImGui::GetIO().FontGlobalScale = mainScale;
+                    }
+                }
+                ImGui::SameLine();
+                ImGui::Text("%.0f%%", mainScale * 100.0f);
+                ImGui::SameLine();
+                if (ImGui::Button("+##Font"))
+                {
+                    mainScale += 0.1f;
+                    ImGui::GetIO().FontGlobalScale = mainScale;
+                }
 
                 ImGuiColorEditFlags colorFlags = ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreview;
                 if (!debugPause) colorFlags |= ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoDragDrop;
@@ -265,16 +290,15 @@ public:
             }
             ImGui::EndMenu();
         }
-        // ImGui::PopItemWidth();
-        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "V0.74");
+        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "V0.75");
         ImGui::End();
     }
 
     void drawOpcodeWindow(Chip8 chip8)
     {
-        ImGui::SetNextWindowPos(ImVec2(windowWidth * debugWindowProportion.x + 5, 5), ImGuiCond_None);
-        ImGui::SetNextWindowSize(ImVec2(windowWidth * opcodeWindowProportion.x - 5,
-            windowHeight * opcodeWindowProportion.y - 5));
+        ImGui::SetNextWindowPos(ImVec2(windowWidth * debugWindowProportion.x, 0), ImGuiCond_None);
+        ImGui::SetNextWindowSize(ImVec2(windowWidth * opcodeWindowProportion.x,
+            windowHeight * opcodeWindowProportion.y));
         ImGui::Begin("Opcode", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
          // Prev values
         ImGui::BeginGroup();
@@ -304,9 +328,8 @@ public:
         ImGui::SetNextWindowSize(ImVec2(windowWidth/2, windowHeight/2));
         ImGui::Begin("Registers", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
        
-
         // Registers table config
-        ImVec2 vOuterSize = ImVec2(160.0f, 50.0f);
+        ImVec2 vOuterSize = ImVec2(100.0f * mainScale, 50.0f * mainScale);
         // Prev V
         ImGui::BeginGroup();
         {
@@ -366,7 +389,7 @@ public:
             ImGui::EndGroup();
         }
         ImGui::SameLine();
-        ImVec2 stackOuterSize = ImVec2(140.0f, 50.0f);
+        ImVec2 stackOuterSize = ImVec2(140.0f * mainScale, 50.0f * mainScale);
         // Prev Stack
         ImGui::BeginGroup();
         {
@@ -425,7 +448,6 @@ public:
                 ImGui::EndGroup();
             }
         }
-        ImGui::EndGroup();
         ImGui::End();
     }
 
@@ -441,7 +463,7 @@ public:
                 (ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
                 ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
                 ImGuiTableFlags_SizingFixedFit),
-                ramOuterSize))
+                ImVec2(ramOuterSize.x * 0.99f, ramOuterSize.y * 0.90f)))
         {
 
             ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthStretch);
@@ -470,19 +492,19 @@ public:
                         {
                             // Highlight previous PC
                             cellBgColor = ImGui::GetColorU32(ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
-                            ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f) ,"0x%02X", chip8.getRAM()[col + row*16]);
+                            ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f) ,"%02X", chip8.getRAM()[col + row*16]);
                             ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
                         }
                         else if (chip8.getPC() == (col + row*16) || chip8.getPC() == (col + row*16)-1)
                         {
                             // Highlight current PC
                             cellBgColor = ImGui::GetColorU32(ImVec4(0.3f, 0.3f, 0.7f, 0.65f));
-                            ImGui::Text("0x%02X", chip8.getRAM()[col + row*16]);
+                            ImGui::Text("%02X", chip8.getRAM()[col + row*16]);
                             ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
                         }
                         else
                         {
-                            ImGui::Text("0x%02X", chip8.getRAM()[col + row*16]);
+                            ImGui::Text("%02X", chip8.getRAM()[col + row*16]);
                         }
                     }
                 }
@@ -510,7 +532,7 @@ public:
         // Debug UI
         if (debugUI)
         {
-            drawDebugWindow(chip8);
+            drawDebugMenuWindow(chip8);
             
             // CHIP-8 display
             drawDisplayWindow();

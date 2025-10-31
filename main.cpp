@@ -24,31 +24,44 @@ int main(int argc, char *argv[])
     // CHIP-8 to load for save state
     Chip8 saveStateChip8;
     
-    clock_t lastFrameTime = clock();
-
-    double frameTime = 1.0 / platform.cyclesPerFrame;
-
     // Continue running program
     bool done = false;
     // CHIP-8 cycles paused
     // Emulate next cycle
     while (!done)
     {   
-        frameTime = 1.0 / platform.cyclesPerFrame;
-
         done = platform.processInput(chip8.Keys, chip8.PrevKeys, platform.debugPause, platform.debugNextCycle);
 
-        double deltaTime = (clock() - lastFrameTime);
-
-        while ((deltaTime < frameTime && !platform.debugPause) || (platform.debugPause &&  platform.debugNextCycle))
+        int cyclesThisFrame = 0;
+        if (platform.debugPause)
         {
-            // lastFrameTime = currentTime;
-            deltaTime = (clock() - lastFrameTime);
-            chip8.cycle();
-            platform.debugNextCycle = false;    // This gets set in renderUI
+            // If paused, only run when stepping
+            cyclesThisFrame = platform.debugNextCycle ? 1 : 0;
         }
+        else
+        {
+            cyclesThisFrame = platform.cyclesPerFrame;
+        }
+
+        for (int i = 0; i < cyclesThisFrame; i++)
+        {
+            chip8.cycle();
+        }
+        platform.debugNextCycle = false;
         
-        // platform.debugNextCycle = false;    // This gets set in renderUI
+        // Decrement timers at 60Hz
+        static Uint64 lastTimerUpdate = SDL_GetTicks();
+        Uint64 currentTicks = SDL_GetTicks();
+
+        if (currentTicks - lastTimerUpdate >= 16) // Approx 60Hz
+        {
+            if (chip8.DelayTimer > 0)
+                chip8.DelayTimer--;
+            if (chip8.SoundTimer > 0)
+                chip8.SoundTimer--;
+            lastTimerUpdate = currentTicks;
+        }
+
         if (chip8.DrawFlag)
         {
             platform.writeToBuffer(chip8.Display);
@@ -56,8 +69,6 @@ int main(int argc, char *argv[])
         
         platform.renderUI(chip8);
         chip8.DrawFlag = false;
-
-        lastFrameTime = clock();
 
         // Load & Save state
         if (platform.saveNewState)

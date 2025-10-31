@@ -109,3 +109,10 @@ add_custom_command(TARGET CHIP8 POST_BUILD
           $<TARGET_FILE_DIR:CHIP8>
   COMMAND_EXPAND_LISTS
 )
+
+# -----------------------------
+# Include fonts
+# -----------------------------
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/fonts/Roboto/Roboto-Regular.ttf
+               ${CMAKE_CURRENT_BINARY_DIR}/fonts/Roboto/Roboto-Regular.ttf
+               COPYONLY)
