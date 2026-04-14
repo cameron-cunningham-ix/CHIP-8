@@ -60,6 +60,8 @@ int main(int argc, char *argv[])
             lastTimerUpdate = currentTicks;
         }
 
+        platform.updateAudio(chip8.soundTimer);
+
         if (chip8.drawFlag)
         {
             platform.writeToBuffer(chip8.display);

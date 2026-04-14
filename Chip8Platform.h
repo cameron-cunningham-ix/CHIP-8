@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstring>
 #include <cmath>
+#include <vector>
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
@@ -20,6 +21,15 @@ private:
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
     SDL_Texture* texture = nullptr;
+    // Audio
+    SDL_AudioStream* audioStream = nullptr;
+    std::vector<int16_t> toneSamples;               // Audio sample data
+    // tonePhaseIndex keeps track of index into toneSamples
+    int tonePhaseIndex = 0;
+    static constexpr int AUDIO_SAMPLE_RATE = 44100; // 44.1 kHz, standard sample rate for music and sound
+    static constexpr int TONE_FREQ = 440;           // 440 Hz
+    static constexpr int16_t TONE_AMP = 16000;
+
     
 public:
     // UI proportions
@@ -44,6 +54,8 @@ public:
     int cyclesPerFrame = 1;
     float frameRate = 60.0f;
     char* currentROMPath = nullptr;
+    // Audio
+    float audioVolume = 0.5f;
 
     /// @brief 
     /// @param title Title of SDL window created, appears at top
@@ -54,10 +66,9 @@ public:
     Chip8Platform(char* title, int windowWidth, int windowHeight, int textureWidth, int textureHeight)
     {
         // SDL Initializations
-        if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+        if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_AUDIO))
         {
-            SDL_GetError();
-            std::cerr << "SDL failed to initialize\n";
+            std::cerr << "SDL failed to initialize: " << SDL_GetError() << "\n";
         }
 
         mainScale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
@@ -66,8 +77,7 @@ public:
         window = SDL_CreateWindow(title, (int)windowWidth*mainScale, (int)windowHeight*mainScale, windowFlags);
         if (!window)
         {
-            SDL_GetError();
-            std::cerr << "SDL failed to initialize the window\n";
+            std::cerr << "SDL failed to initialize the window: " << SDL_GetError() << "\n";
         }
         this->windowWidth = windowWidth*mainScale;
         this->windowHeight = windowHeight*mainScale;
@@ -75,8 +85,7 @@ public:
         renderer = SDL_CreateRenderer(window, NULL);
         if (!renderer)
         {
-            SDL_GetError();
-            std::cerr << "SDL failed to initialize the renderer\n";
+            std::cerr << "SDL failed to initialize the renderer: " << SDL_GetError() << "\n";
         }
 
         SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
@@ -86,8 +95,7 @@ public:
             SDL_TEXTUREACCESS_STREAMING, textureWidth, textureHeight);
         if (!texture)
         {
-            SDL_GetError();
-            std::cerr << "SDL failed to initialize the texture\n";
+            std::cerr << "SDL failed to initialize the texture: " << SDL_GetError() << "\n";
         }
         this->textureWidth = textureWidth;
         this->textureHeight = textureHeight;
@@ -98,8 +106,7 @@ public:
         frameBuffer = (unsigned int*)calloc(textureWidth * textureHeight, sizeof(unsigned int));
         if (!frameBuffer)
         {
-            SDL_GetError();
-            std::cerr << "SDL failed to allocate framebuffer\n";
+            std::cerr << "SDL failed to allocate framebuffer: " << SDL_GetError() << "\n";
         }
         this->textureScale = textureScale;
         SDL_Log("SDL Initialized\n");
@@ -132,6 +139,24 @@ public:
         {
             SDL_Log("Native File Dialog failed to initialize\n");
         }
+
+        // Audio initialization
+        SDL_AudioSpec spec = {};
+        spec.format = SDL_AUDIO_S16;
+        spec.channels = 1;      // Mono sound
+        spec.freq = AUDIO_SAMPLE_RATE;
+        audioStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
+        
+        if (audioStream)
+        {
+            SDL_SetAudioStreamGain(audioStream, audioVolume);
+            SDL_ResumeAudioStreamDevice(audioStream);   // AudioStream objects start paused, so start it
+            generateTone();
+        }
+        else 
+        {
+            std::cerr << "SDL audio failed: " << SDL_GetError() << "\n";
+        }
     }
 
     ~Chip8Platform()
@@ -143,6 +168,7 @@ public:
         SDL_DestroyTexture(texture);
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
+        if (audioStream) { SDL_DestroyAudioStream(audioStream); }
         SDL_Quit();
     }
 
@@ -329,6 +355,13 @@ public:
                 ImGui::SetItemTooltip("NOTE: Set color only when emulation is paused");
                 ImGui::ColorPicker4("Off Color", &offColorRef.x, colorFlags);
 
+            }
+            if (ImGui::CollapsingHeader("Audio"))
+            {
+                if (ImGui::SliderFloat("Volume", &audioVolume, 0.0f, 1.0f))
+                {
+                    if (audioStream) SDL_SetAudioStreamGain(audioStream, audioVolume);
+                }
             }
             ImGui::EndMenu();
         }
@@ -643,6 +676,55 @@ public:
             for (int j = 0; j < textureWidth; j++, c++)
             {
                 frameBuffer[c] = display[j + i*textureWidth];
+            }
+        }
+    }
+
+    /// @brief Generate the audio tone 
+    void generateTone()
+    {
+        toneSamples.resize(AUDIO_SAMPLE_RATE);
+        // Sample rate is number of times the audio is sampled per second, 44.1 kHz
+        // Frequency is in Hz, so 440 Hz means 440 cycles / sec
+        // Tone's period is the sample rate / the frequency, i.e. the number of samples in 440 cycles 
+        int period = AUDIO_SAMPLE_RATE / TONE_FREQ;
+        for (int i = 0; i < AUDIO_SAMPLE_RATE; i++)
+        {
+            // The amplitutde and ocsillation between values is what gives the sound its tone
+            toneSamples[i] = ((i % period) < period / 2) ? TONE_AMP : -TONE_AMP;
+        }
+    }
+
+    /// @brief Update audio stream
+    /// @param soundTimer 
+    void updateAudio(uint8_t soundTimer)
+    {
+        if (!audioStream) return;
+
+        if (soundTimer > 0)
+        {
+            // Keep ~100 ms of audio to avoid gaps
+            constexpr int TARGET_SAMPLES = AUDIO_SAMPLE_RATE / 10;
+            // Check number of samples currently queued in audioStream
+            int queued = SDL_GetAudioStreamQueued(audioStream) / (int)sizeof(int16_t);
+            int toWrite = TARGET_SAMPLES - queued;  // Number of samples to write to audioStream to keep 100 ms queue
+            while (toWrite > 0)
+            {
+                int chunk = std::min(toWrite, (int)toneSamples.size() - tonePhaseIndex);
+                // Add data to audioStream
+                SDL_PutAudioStreamData(audioStream,
+                    &toneSamples[tonePhaseIndex],
+                    chunk * (int)sizeof(int16_t));
+                tonePhaseIndex = (tonePhaseIndex + chunk) % (int)toneSamples.size();
+                toWrite -= chunk;
+            }
+        }
+        else
+        {
+            if (SDL_GetAudioStreamQueued(audioStream) > 0)
+            {
+                SDL_ClearAudioStream(audioStream);
+                tonePhaseIndex = 0;
             }
         }
     }
