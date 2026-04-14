@@ -24,7 +24,7 @@ set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
   SDL3
   GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-  GIT_TAG main
+  GIT_TAG 5848e584a1b606de26e3dbd1c7e4ecbc34f807a6
 )
 FetchContent_MakeAvailable(SDL3) # Provides SDL3::SDL3 and SDL3::SDL3main
 
@@ -34,7 +34,7 @@ FetchContent_MakeAvailable(SDL3) # Provides SDL3::SDL3 and SDL3::SDL3main
 FetchContent_Declare(
   imgui
   GIT_REPOSITORY https://github.com/ocornut/imgui.git
-  GIT_TAG docking
+  GIT_TAG bbcc83e999c5e08852a83c0c1c4af2ada515f9eb
 )
 
 FetchContent_GetProperties(imgui)

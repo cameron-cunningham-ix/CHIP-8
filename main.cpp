@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <string.h>
-#include <string>
 #include <time.h>
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_main.h"
@@ -30,7 +28,7 @@ int main(int argc, char *argv[])
     // Emulate next cycle
     while (!done)
     {   
-        done = platform.processInput(chip8.Keys, chip8.PrevKeys, platform.debugPause, platform.debugNextCycle);
+        done = platform.processInput(chip8.keys, chip8.prevKeys, platform.debugPause, platform.debugNextCycle);
 
         int cyclesThisFrame = 0;
         if (platform.debugPause)
@@ -55,20 +53,20 @@ int main(int argc, char *argv[])
 
         if (currentTicks - lastTimerUpdate >= 16) // Approx 60Hz
         {
-            if (chip8.DelayTimer > 0)
-                chip8.DelayTimer--;
-            if (chip8.SoundTimer > 0)
-                chip8.SoundTimer--;
+            if (chip8.delayTimer > 0)
+                chip8.delayTimer--;
+            if (chip8.soundTimer > 0)
+                chip8.soundTimer--;
             lastTimerUpdate = currentTicks;
         }
 
-        if (chip8.DrawFlag)
+        if (chip8.drawFlag)
         {
-            platform.writeToBuffer(chip8.Display);
+            platform.writeToBuffer(chip8.display);
         }
         
         platform.renderUI(chip8);
-        chip8.DrawFlag = false;
+        chip8.drawFlag = false;
 
         // Load & Save state
         if (platform.saveNewState)
@@ -78,7 +76,7 @@ int main(int argc, char *argv[])
         if (platform.loadSaveState)
         {
             chip8 = saveStateChip8;
-            chip8.DrawFlag = true;
+            chip8.drawFlag = true;
         }
         
         platform.saveNewState = false;

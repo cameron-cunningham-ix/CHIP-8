@@ -1,11 +1,8 @@
 #ifndef CHIP8_H
 #define CHIP8_H
 
-
-
 typedef unsigned char uint_8;
 typedef unsigned short int uint_16;
-
 
 /// @brief CHIP-8 interpreter class for interpreting / "emulating" CHIP-8 ROMs.
 /// Can be hooked into multiple platforms such as SDL, OpenGL + GLFW/, etc.
@@ -18,30 +15,30 @@ private:
     static const uint_8 DISPLAY_WIDTH = 64;
     static const uint_8 DISPLAY_HEIGHT = 32;
 
-    uint_16 Stack[16];
-    uint_16 SP;             // Stack Pointer
+    uint_16 stack[16];
+    uint_16 sp;             // Stack Pointer
     
-    uint_8 RAM[4096];
-    uint_8 V[16];           // Variable registers: V0 - VF; VF is flag register
+    uint_8 ram[4096];
+    uint_8 v[16];           // Variable registers: V0 - VF; VF is flag register
 
-    uint_16 PC;             // Points at current instruction in memory
-    uint_16 I;              // Index register - point at locations in memory
-    uint_16 Opcode;         // Opcode - stores the current instruction
+    uint_16 pc;             // Points at current instruction in memory
+    uint_16 idx;              // Index register - point at locations in memory
+    uint_16 opcode;         // Opcode - stores the current instruction
 
     // Helpers
-    // uint_16 PrevOpcode;     // For debug UI
-    uint_16 Nib1;           // First nibble (half byte) N000
-    uint_16 Nib2;           // Last nibble 000N
-    uint_16 Vx;             // Register Vx, not value in Vx
-    uint_16 Vy;             // Register Vy, not value in Vy
+    // uint_16 prevOpcode;     // For debug UI
+    uint_16 nib1;           // First nibble (half byte) N000
+    uint_16 nib2;           // Last nibble 000N
+    uint_16 vx;             // Register vx, not value in vx
+    uint_16 vy;             // Register vy, not value in vy
 
     void initialize();
 
     // Table functions
-    void Table0();
-    void Table8();
-    void TableE();
-    void TableF();
+    void table0();
+    void table8();
+    void tableE();
+    void tableF();
     // Opcode functions
     void op_00e0();
     void op_00ee();
@@ -81,33 +78,33 @@ private:
     
 public:
     
-    uint_8 Keys[16];        // HEX keypad for current frame
-    uint_8 PrevKeys[16];    // HEX keys from last frame; used for telling when key is released
+    uint_8 keys[16];        // HEX keypad for current frame
+    uint_8 prevKeys[16];    // HEX keys from last frame; used for telling when key is released
     
     // Previous values, used for debugging
-    uint_16 PrevStack[16];
-    uint_16 PrevSP;             // Stack Pointer
-    uint_8 PrevV[16];           // Variable registers: V0 - VF; VF is flag register
-    uint_16 PrevPC;             // Points at current instruction in memory
-    uint_16 PrevI;              // Index register - point at locations in memory
-    uint_16 PrevOpcode;         // Opcode - stores the current instruction
+    uint_16 prevStack[16];
+    uint_16 prevSP;             // Stack Pointer
+    uint_8 prevV[16];           // Variable registers: V0 - VF; VF is flag register
+    uint_16 prevPC;             // Points at current instruction in memory
+    uint_16 prevIdx;              // Index register - point at locations in memory
+    uint_16 prevOpcode;         // Opcode - stores the current instruction
 
     // Timers
-    uint_8 DelayTimer;
-    uint_8 SoundTimer;
+    uint_8 delayTimer;
+    uint_8 soundTimer;
 
-    unsigned int Display[DISPLAY_WIDTH * DISPLAY_HEIGHT];
-    bool DrawFlag;          // Set when draw required
+    unsigned int display[DISPLAY_WIDTH * DISPLAY_HEIGHT];
+    bool drawFlag;          // Set when draw required
 
     // Configuration
     // Used for ambiguous instructions, i.e. instructions that change between CHIP-8 and SUPER-CHIP.
     // 0 - CHIP-8   1 - SUPER-CHIP
     // int CycleDelay = 1;
-    bool ConfigShift;
-    bool ConfigJumpWOffset;
+    bool configShift;
+    bool configJumpWOffset;
     // Styling
-    unsigned int OnColor;
-    unsigned int OffColor;
+    unsigned int onColor;
+    unsigned int offColor;
 
     Chip8();
     ~Chip8();
@@ -121,30 +118,30 @@ public:
     void setOffColor(unsigned int color);
 
     // Immutable getters for debugging
-    const uint_16* getStack() const { return Stack; }
-    const uint_16 getSP() const { return SP; }
-    const uint_8* getRAM() const { return RAM; }
-    const uint_8* getVs() const { return V; }
-    const uint_16 getPC() const { return PC; }
-    const uint_16 getI() const { return I; }
-    const uint_16 getOpcode() const { return Opcode; }
-    const uint_16 getOpcodeAt(uint_16 addr) const { return (RAM[addr] << 8) | RAM[addr + 1]; }
-    const uint_8* getKeys() const { return Keys; }
-    const uint_8* getPrevKeys() const { return PrevKeys; }
-    const uint_8 getSoundTimer() const { return SoundTimer; }
-    const uint_8 getDelayTimer() const { return DelayTimer; }
-    const unsigned int* getDisplay() const { return Display; }
+    const uint_16* getStack() const { return stack; }
+    const uint_16 getSP() const { return sp; }
+    const uint_8* getRAM() const { return ram; }
+    const uint_8* getVs() const { return v; }
+    const uint_16 getPC() const { return pc; }
+    const uint_16 getI() const { return idx; }
+    const uint_16 getOpcode() const { return opcode; }
+    const uint_16 getOpcodeAt(uint_16 addr) const { return (ram[addr] << 8) | ram[addr + 1]; }
+    const uint_8* getKeys() const { return keys; }
+    const uint_8* getPrevKeys() const { return prevKeys; }
+    const uint_8 getSoundTimer() const { return soundTimer; }
+    const uint_8 getDelayTimer() const { return delayTimer; }
+    const unsigned int* getDisplay() const { return display; }
     const char* getOpcodeDescription(uint_16 opcode);
 
     // Function pointer alias for Opcode FP tables
     typedef void (Chip8::*Chip8Func)();
     // Table size based on highest opcode value in that set
     // e.g. table F has opcode fx65, so we need 0x65 + 1 to index into
-    Chip8Func FnTable[0xF + 1];
-    Chip8Func FnTable0[0xE + 1];
-    Chip8Func FnTable8[0xE + 1];
-    Chip8Func FnTableE[0xE + 1];
-    Chip8Func FnTableF[0x65 + 1];
+    Chip8Func fnTable[0xF + 1];
+    Chip8Func fnTable0[0xE + 1];
+    Chip8Func fnTable8[0xE + 1];
+    Chip8Func fnTableE[0xE + 1];
+    Chip8Func fnTableF[0x65 + 1];
 };
 
 #endif

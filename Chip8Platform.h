@@ -1,19 +1,18 @@
 #include <iostream>
 #include <cstring>
+#include <cmath>
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_main.h"
 #include "nfd.h"
-#include <cmath>
 
 /// @brief SDL + ImGui platform for CHIP-8 rendering and input
 class Chip8Platform
 {
 private:
     unsigned int* frameBuffer = nullptr;
-    static int done;
     int windowWidth;
     int windowHeight;
     int textureWidth;
@@ -23,8 +22,6 @@ private:
     SDL_Texture* texture = nullptr;
     
 public:
-    // UI flags
-    bool m_ShowEmulationSettings = false;
     // UI proportions
     ImVec2 debugWindowProportion = ImVec2(0.25f, 0.5f);
     ImVec2 displayWindowProportion = ImVec2(0.5f, 0.5f);
@@ -285,9 +282,9 @@ public:
                 {
                     if (frameRate < 120) frameRate++;
                 }
-                ImGui::Checkbox("Shift Vy", &chip8.ConfigShift);
+                ImGui::Checkbox("Shift vy", &chip8.configShift);
                 ImGui::SetItemTooltip("Off - CHIP-8 functionality\nOn - CHIP-48 & SCHIP functionality");
-                ImGui::Checkbox("Jump W/ Offset", &chip8.ConfigJumpWOffset);
+                ImGui::Checkbox("Jump W/ Offset", &chip8.configJumpWOffset);
                 ImGui::SetItemTooltip("Off - CHIP-8 functionality\nOn - CHIP-48 & SCHIP functionality");
             }
             if (ImGui::CollapsingHeader("Display", ImGuiTreeNodeFlags_None))
@@ -348,10 +345,10 @@ public:
          // Prev values
         ImGui::BeginGroup();
         {
-            ImGui::Text("Prev PC: %04X", chip8.PrevPC);
-            ImGui::Text("Prev I: %04X", chip8.PrevI);
-            ImGui::Text("Prev SP: %04X", chip8.PrevSP);
-            ImGui::Text("Prev Opcode: %04X", chip8.PrevOpcode);
+            ImGui::Text("Prev PC: %04X", chip8.prevPC);
+            ImGui::Text("Prev idx: %04X", chip8.prevIdx);
+            ImGui::Text("Prev SP: %04X", chip8.prevSP);
+            ImGui::Text("Prev Opcode: %04X", chip8.prevOpcode);
             ImGui::EndGroup();
         }
         ImGui::SameLine();
@@ -359,7 +356,7 @@ public:
         ImGui::BeginGroup();
         {
             ImGui::Text("Curr PC: %04X", chip8.getPC());
-            ImGui::Text("Curr I: %04X", chip8.getI());
+            ImGui::Text("Curr idx: %04X", chip8.getI());
             ImGui::Text("Curr SP: %04X", chip8.getSP());
             ImGui::Text("Curr Opcode: %04X", chip8.getOpcode());
             ImGui::EndGroup();
@@ -398,7 +395,7 @@ public:
                     ImGui::TableSetColumnIndex(0);
                     ImGui::Text("V[0x%1X]", row);
                     ImGui::TableSetColumnIndex(1);
-                    ImGui::Text("0x%02X", chip8.PrevV[row]);
+                    ImGui::Text("0x%02X", chip8.prevV[row]);
 
                 }
                 ImGui::EndTable();
@@ -423,7 +420,7 @@ public:
                     ImGui::TableSetColumnIndex(0);
                     ImGui::Text("V[0x%X]", row);
                     ImGui::TableSetColumnIndex(1);
-                    if (chip8.getVs()[row] != chip8.PrevV[row])
+                    if (chip8.getVs()[row] != chip8.prevV[row])
                     {
                         ImU32 cellBgColor = ImGui::GetColorU32(ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
                         ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
@@ -458,7 +455,7 @@ public:
                     ImGui::TableSetColumnIndex(0);
                     ImGui::Text("Stack[0x%1X]", row);
                     ImGui::TableSetColumnIndex(1);
-                    ImGui::Text("0x%02X", chip8.PrevStack[row]);
+                    ImGui::Text("0x%02X", chip8.prevStack[row]);
 
                 }
                 ImGui::EndTable();
@@ -483,7 +480,7 @@ public:
                     ImGui::TableSetColumnIndex(0);
                     ImGui::Text("Stack[0x%X]", row);
                     ImGui::TableSetColumnIndex(1);
-                    if (chip8.getStack()[row] != chip8.PrevStack[row])
+                    if (chip8.getStack()[row] != chip8.prevStack[row])
                     {
                         ImU32 cellBgColor = ImGui::GetColorU32(ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
                         ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cellBgColor);
@@ -539,7 +536,7 @@ public:
                         // ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
                         ImGui::TableSetColumnIndex(col + 1);
 
-                        if (chip8.PrevPC == (col + row*16) || chip8.PrevPC == (col + row*16)-1)
+                        if (chip8.prevPC == (col + row*16) || chip8.prevPC == (col + row*16)-1)
                         {
                             // Highlight previous PC
                             cellBgColor = ImGui::GetColorU32(ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
@@ -594,14 +591,14 @@ public:
 
             drawOpcodeWindow(chip8);
             
-            if (chip8.OnColor != vec4ToRGBA(onColorRef))
+            if (chip8.onColor != vec4ToRGBA(onColorRef))
                 chip8.setOnColor(vec4ToRGBA(onColorRef));
-            if (chip8.OffColor != vec4ToRGBA(offColorRef))
+            if (chip8.offColor != vec4ToRGBA(offColorRef))
                 chip8.setOffColor(vec4ToRGBA(offColorRef));
         }
 
         // Copy data from frameBuffer into texture
-        if (chip8.DrawFlag)
+        if (chip8.drawFlag)
         {
             char* pix = NULL;
             int pitch = 0;
@@ -658,7 +655,7 @@ public:
     /// @return True when quit 
     bool processInput(unsigned char* keys, unsigned char* prevKeys, bool& pause, bool& nextCycle)
     {
-        // Before processing this frame/cycle, set PrevKeys to Keys
+        // Before processing this frame/cycle, set prevKeys to keys
         for (int i = 0; i < 16; i++)
         {
             prevKeys[i] = keys[i];
